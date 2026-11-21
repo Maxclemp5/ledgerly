@@ -1,0 +1,13 @@
+{
+  "id": "cus_0005",
+  "full_name": "Empty Period Demo Customer",
+  "accounts": [
+    {
+      "id": "acc_0005",
+      "customer_id": "cus_0005",
+      "currency": "USD",
+      "status": "active",
+      "account_number": "000000000005"
+    }
+  ]
+}
