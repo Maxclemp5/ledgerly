@@ -1,0 +1,30 @@
+{
+  "statementId": "STMT-DEMO-2026-08-001",
+  "customer": {
+    "name": "Alex Morgan (Example)",
+    "accountReference": "DEMO-GBP-004721"
+  },
+  "currency": "GBP",
+  "period": {
+    "from": "2026-08-01",
+    "to": "2026-08-31"
+  },
+  "openingBalance": "1250.00",
+  "closingBalance": "1950.00",
+  "transactions": [
+    {
+      "id": "TX-DEMO-001",
+      "date": "2026-08-05",
+      "description": "Example incoming payment",
+      "type": "credit",
+      "amount": "750.00"
+    },
+    {
+      "id": "TX-DEMO-002",
+      "date": "2026-08-10",
+      "description": "Example card purchase",
+      "type": "debit",
+      "amount": "50.00"
+    }
+  ]
+}
