@@ -1,0 +1,39 @@
+{
+  "account_id": "acc_0001",
+  "customer_id": "cus_0001",
+  "currency": "USD",
+  "period": {
+    "from": "2026-10-01",
+    "to": "2026-10-31"
+  },
+  "opening_balance": 0,
+  "closing_balance": 3117.42,
+  "total_payments": 4217.07,
+  "total_deposits": 7334.49,
+  "transactions": [
+    {
+      "date": "2026-10-02",
+      "description": "Client payment",
+      "amount": 1330.91,
+      "balance": 1330.91
+    },
+    {
+      "date": "2026-10-03",
+      "description": "FX conversion fee",
+      "amount": -563.12,
+      "balance": 767.79
+    },
+    {
+      "date": "2026-10-05",
+      "description": "Card purchase",
+      "amount": -344.26,
+      "balance": 423.53
+    },
+    {
+      "date": "2026-10-08",
+      "description": "Wire deposit",
+      "amount": 177,
+      "balance": 600.53
+    }
+  ]
+}
