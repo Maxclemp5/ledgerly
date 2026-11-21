@@ -1,0 +1,5 @@
+.git
+target
+.local-classes
+README.md
+*.zip
