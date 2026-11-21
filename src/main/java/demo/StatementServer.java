@@ -62,6 +62,23 @@ public final class StatementServer {
     server.createContext("/api/statement.pdf", StatementServer::statementEndpoint);
     server.createContext("/", StatementServer::home);
     server.setExecutor(Executors.newFixedThreadPool(4));
+    // Exercise the real OpenPDF renderer and read its actual PDF metadata at startup.
+    Statement smoke = new Statement("Fictional Test User", "DEMO-SMOKE", "GBP",
+      LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31),
+      new BigDecimal("100.00"),
+      List.of(new Entry(LocalDate.of(2026, 8, 5), "Demo credit", true, new BigDecimal("12.50"))));
+    byte[] samplePdf = render(smoke);
+    com.lowagie.text.pdf.PdfReader reader = new com.lowagie.text.pdf.PdfReader(samplePdf);
+    try {
+      String producer = reader.getInfo().get("Producer");
+      if (producer == null || !producer.contains("OpenPDF")) {
+        throw new IllegalStateException("Unexpected PDF producer: " + producer);
+      }
+      System.out.println("OpenPDF self-test passed: pages=" + reader.getNumberOfPages()
+        + ", bytes=" + samplePdf.length + ", Producer=" + producer);
+    } finally {
+      reader.close();
+    }
     server.start();
     System.out.println("Ledgerly OpenPDF 1.3.35 demo listening on port " + port);
   }
