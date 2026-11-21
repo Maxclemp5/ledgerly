@@ -1,0 +1,28 @@
+{
+  "id": "cus_0001",
+  "first_name": "Amina",
+  "last_name": "Rauf",
+  "full_name": "Amina Rauf",
+  "email": "amina.rauf@example.test",
+  "kyc_status": "verified",
+  "address": {
+    "line1": "101 Demo Street",
+    "city": "Lahore",
+    "region": "Punjab",
+    "postal_code": "10111",
+    "country": "XX"
+  },
+  "created_at": "2026-01-05T09:00:00Z",
+  "accounts": [
+    {
+      "id": "acc_0001",
+      "customer_id": "cus_0001",
+      "currency": "USD",
+      "status": "active",
+      "bank_name": "DEMO SANDBOX BANK",
+      "account_number": "000000000001",
+      "routing_number": "000000000",
+      "opened_at": "2026-01-05T09:00:00Z"
+    }
+  ]
+}
