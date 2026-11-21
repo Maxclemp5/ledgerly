@@ -61,6 +61,7 @@ public final class StatementServer {
     });
     server.createContext("/api/statement.pdf", StatementServer::statementEndpoint);
     server.createContext("/internal/statements/render", StatementJsonModule::handle);
+    server.createContext("/internal/statements/from-provider", ProviderStatementEndpoint::handle);
     server.createContext("/", StatementServer::home);
     server.setExecutor(Executors.newFixedThreadPool(4));
     // Exercise the real OpenPDF renderer and read its actual PDF metadata at startup.
