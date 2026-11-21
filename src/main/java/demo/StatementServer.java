@@ -60,6 +60,7 @@ public final class StatementServer {
       respond(exchange, 200, "text/plain; charset=utf-8", "ok".getBytes(StandardCharsets.UTF_8));
     });
     server.createContext("/api/statement.pdf", StatementServer::statementEndpoint);
+    server.createContext("/internal/statements/render", StatementJsonModule::handle);
     server.createContext("/", StatementServer::home);
     server.setExecutor(Executors.newFixedThreadPool(4));
     // Exercise the real OpenPDF renderer and read its actual PDF metadata at startup.
@@ -211,7 +212,7 @@ public final class StatementServer {
     return String.format(Locale.US, "%,.2f", number);
   }
 
-  private static byte[] render(Statement statement) throws Exception {
+  static byte[] render(Statement statement) throws Exception {
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     Document doc = new Document(PageSize.A4, 43, 43, 48, 61);
     PdfWriter writer = PdfWriter.getInstance(doc, bytes);
