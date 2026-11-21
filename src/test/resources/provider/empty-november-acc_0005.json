@@ -1,0 +1,14 @@
+{
+  "account_id": "acc_0005",
+  "customer_id": "cus_0005",
+  "currency": "USD",
+  "period": {
+    "from": "2026-11-18",
+    "to": "2026-11-21"
+  },
+  "opening_balance": 0,
+  "closing_balance": 0,
+  "total_payments": 0,
+  "total_deposits": 0,
+  "transactions": []
+}
