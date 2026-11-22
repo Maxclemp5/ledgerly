@@ -1,57 +1,53 @@
-# Ledgerly — Neon Auth + Render Free test deployment
+# LedgerDesk Manager Portal — Neon Auth / Render Free (development)
 
-The **isolated Free test service** uses Render Free, Neon Free PostgreSQL and Neon Auth (Managed Better Auth). The existing **paid Render service is unchanged**, has auto-deploy disabled, and must not be redeployed using this migration without a separate review.
+This **isolated test deployment** hosts one manager-only React/Vite UI and Node.js API in a single Render Free container, backed by a restricted Neon Free PostgreSQL role. The **existing paid Render service is unchanged**, and its Blueprint must not be applied to Free testing.
 
-This project implements a customer-scoped statement-*request* API. It cannot issue bank statements from manually entered records and cannot download issuer-certified PDFs until an authorized issuer integration is implemented.
+## Login and role access
 
-## Free test environment
+- `/manager`, `/login`, and `/` display the **Manager Portal** only.
+- Public registration is disabled in Neon Auth, and no signup interface is served.
+- Existing manager identities are provisioned by a Neon administrator. If necessary, the manager verifies their email using OTP and sets their own private password with OTP.
+- Manager first-login password rotation is mandatory where `require_password_change` is set in `manager_authorizations`.
+- `GET /v1/me/access` returns signed-in role authorization, active issuer organizations and any pending password-change requirement.
+- All `/v1/manager/*` operations use server-side active `manager_authorizations` grants and issuer filtering. JWT role fields, browser selections and form submissions cannot grant manager access.
 
-- API: `https://ledgerly-free-test-api.onrender.com`
-- Source: `cloud-statement-api/` on `main`
-- Hosted auth: Neon Auth on the project's default branch; email/password with email OTP verification.
-- Database: Neon PostgreSQL `ledgerly_test` in AWS Northern Virginia; only test data.
-- API service plan: Render Free; sleeps after inactivity, so cold-start latency applies.
+## What is not in this module
 
-A **separate** root-level `render.yaml` still describes the earlier paid Render Blueprint. Do not apply it to Free testing, since that would create or update paid resources.
+- `/customer`, `/signup`, `/register` respond with 404. The Customer Dashboard and public customer Login/Signup UI have been removed.
+- Customer `/v1/me/*` endpoints, except `/v1/me/access`, are disabled by default in `createHandler`. The dormant legacy handlers are preserved only for migration to the future **separate Ledger customer API**; they are not mounted in this Manager service.
+- No customer identity, verified financial account, transaction history, or issued statement is fetched from the external **Ledger API** yet. The owner will supply that integration separately.
+- The Admin Customers screen can create, edit and archive **unverified internal test profiles** under authorized issuer scopes. These are separate from verified banking records and must not be represented as authoritative customer data.
+- Statement issuance and verified bank ledger functions cannot run without separately authorized issuer integrations.
 
-## Auth implementation (Firebase removed)
+## Deployment configuration
 
-The frontend (not deployed yet) signs in through Neon Auth's supported client SDK. For a Vite/React frontend use `@neon/auth`, `createAuthClient`, and `BetterAuthReactAdapter()`; configure `VITE_NEON_AUTH_URL` using the branch's `NEON_AUTH_BASE_URL`. After sign-in, request a short-lived bearer JWT with `authClient.token()`. Send `data.token` as `Authorization: Bearer <token>`.
+Required secret/environment settings on the **Render Free test service only**:
 
-The backend validates EdDSA JWT signatures against the branch JWKS, checks the trusted issuer, expiration and age, and extracts the signed `sub` identity. It does not trust role or issuer claims supplied in the token. A sign-out does not automatically invalidate an already issued JWT; the JWT expires shortly (Neon currently issues 15-minute tokens). No separate Firebase Admin key or Google Cloud project is required.
+- `DATABASE_URL` — least-privileged Neon database connection string with SSL.
+- `NEON_AUTH_BASE_URL` — project's Neon Auth HTTPS endpoint.
+- `NEON_AUTH_JWKS_URL` — project JWKS URL for signed JWT verification.
+- `ALLOWED_WEB_ORIGIN` — exact manager portal origin, `https://ledgerly-free-test-api.onrender.com`.
+- `NODE_ENV=production`
 
-Render Free service environment:
-- `DATABASE_URL`: restricted Neon Postgres runtime role with SSL required
-- `ALLOWED_WEB_ORIGIN`: exact browser origin (development example: `http://localhost:5173`)
-- `NEON_AUTH_BASE_URL`: Neon Auth base URL including `/ledgerly_test/auth`
-- `NEON_AUTH_JWKS_URL`: corresponding HTTPS `/.well-known/jwks.json` URL
+Neither Neon signing credentials nor manager passwords are committed to GitHub.
 
-Never store a database password, auth server signing key or customer records in GitHub or frontend code.
-
-## Customer and manager access
-
-- Customer access is restricted by `customer_identity_links.auth_user_id`, populated only by a trusted operator after verifying the correct customer.
-- `verified_accounts` comes from an issuer-controlled source. A browser cannot set verification status, account ownership, balances or issuance status.
-- Manager access checks the administrator-owned table `manager_authorizations`: caller ID must have an active grant, and the selected account's issuer organization must match that grant. No manager role may be inferred from untrusted JWT fields.
-- The API runtime can `SELECT` `manager_authorizations`, but may not create, edit or delete grants.
-- Never grant the API role permission to alter verified accounts, customer mappings or issuer-approval state.
-- Official document download continues to return `409 ISSUER_NOT_CONNECTED`.
-
-The migration `db/migrations/001_neon_auth.sql` renames the old empty test database's `firebase_uid` field to `auth_user_id` and adds trusted manager grants. **Do not run this automatically against a production database**. Migrate old Firebase identities only via a separately approved identity-mapping plan.
-
-## Verify
+## Test
 
 ```sh
 cd cloud-statement-api
 npm install
 npm test
+cd dashboard
+npm install
+npm run build
 ```
 
-```sh
-curl -i https://ledgerly-free-test-api.onrender.com/health
-curl -i https://ledgerly-free-test-api.onrender.com/v1/me/accounts
-```
+Expected test deployment:
+- `GET /health` returns 200.
+- `GET /manager` displays only the manager portal.
+- `GET /customer`, `GET /signup`, `GET /register` return 404.
+- `GET /v1/manager/summary` with no bearer token returns 401; an authenticated user without an active manager grant receives 403.
+- `GET /v1/me/accounts` is unavailable in the manager service.
+- No public registration is possible through the shared Neon Auth project.
 
-Expected health 200, unauthenticated account endpoint 401. Customer data should stay empty until explicit testing with vetted test records; a signed-in customer with no trusted mapping sees `data:[]`.
-
-This free setup is for evaluation and not approved financial-data production hosting. Before real records or an issuer integration, review security controls, abuse prevention, domain and origin allowlists, data residency, compliance, rate limiting, service uptime, backup and recovery, and network restrictions. Neon Managed Better Auth production needs a configured custom SMTP provider.
+Neon Free/Render Free are for development evaluation; verify backup, availability, rate limits, logging, production SMTP, MFA support and compliance before considering production. The owner controls the future API integration, private-repository change, deployment approval, and eventual revocation of ChatGPT/OpenAI connector access.

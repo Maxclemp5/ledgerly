@@ -28,7 +28,7 @@ async function verify(token){
   throw new Error('invalid token');
 }
 async function withServer(fn){
-  const server=http.createServer(createHandler({verify,store:fixture(),allowedOrigin:'https://app.example.test',logger:{error(){}}}));
+  const server=http.createServer(createHandler({verify,store:fixture(),allowedOrigin:'https://app.example.test',enableCustomerModule:true,logger:{error(){}}}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   try{await fn('http://127.0.0.1:'+server.address().port)}
   finally{await new Promise(resolve=>server.close(resolve))}

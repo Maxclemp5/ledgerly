@@ -18,7 +18,14 @@ export function createStaticHandler({authBaseUrl,publicDir=PUBLIC_DIR}={}){
   return async (req,res)=>{
     if(req.method!=='GET'&&req.method!=='HEAD')return false;
     const pathname=new URL(req.url||'/','http://localhost').pathname;
-    const isIndex=['/','/login','/customer','/manager'].includes(pathname);
+    // Customer authentication and signup belong to a separate Ledger API module.
+    // These retired URLs must never render the Manager portal or a customer login.
+    if(['/customer','/signup','/register'].includes(pathname)){
+      res.writeHead(404,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
+      res.end(JSON.stringify({error:{code:'NOT_FOUND',message:'Customer module not hosted here'}}));
+      return true;
+    }
+    const isIndex=['/','/login','/manager'].includes(pathname);
     const isAsset=/^\/assets\/[a-zA-Z0-9._-]+$/.test(pathname);
     const isFavicon=pathname==='/favicon.svg';
     if(!isIndex&&!isAsset&&!isFavicon)return false;
