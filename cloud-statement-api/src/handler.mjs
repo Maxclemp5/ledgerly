@@ -74,6 +74,10 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
       if(req.headers.origin&&!origin)
         throw new HttpError(403,'ORIGIN_BLOCKED','Origin not allowed');
       const user=await principal(req,verify);
+      if(req.method==='GET'&&url.pathname==='/v1/me/access'){
+        const organizations=await store.listManagerOrganizations(user.uid);
+        return send(res,200,{data:{manager:organizations.length>0,organizations}},origin);
+      }
       if(req.method==='GET'&&url.pathname==='/v1/me/accounts')
         return send(res,200,{data:await store.listAccountsForUid(user.uid)},origin);
       if(req.method==='GET'&&url.pathname==='/v1/me/statement-requests')
@@ -104,6 +108,24 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
         // No PDF is delivered until a separately authorized issuer system is integrated.
         throw new HttpError(409,'ISSUER_NOT_CONNECTED','Issuer-certified PDF delivery is not configured');
       }
+      // All manager data is scoped to active grants and issuer organizations in SQL.
+      const managerPath=url.pathname.startsWith('/v1/manager/');
+      if(managerPath&&!await store.isManager(user.uid)){
+        throw new HttpError(403,'FORBIDDEN','Organization manager access required');
+      }
+      if(req.method==='GET'&&url.pathname==='/v1/manager/summary')
+        return send(res,200,{data:await store.getManagerSummary(user.uid)},origin);
+      if(req.method==='GET'&&url.pathname==='/v1/manager/statement-requests')
+        return send(res,200,{data:await store.listManagerRequests(user.uid)},origin);
+      if(req.method==='GET'&&url.pathname==='/v1/manager/customers'){
+        const query=String(url.searchParams.get('query')||'').trim();
+        if(!/^[A-Za-z0-9_-]{3,100}$/.test(query))
+          throw new HttpError(400,'BAD_QUERY','Enter at least 3 characters of a customer ID');
+        return send(res,200,{data:await store.searchManagerCustomers(user.uid,query)},origin);
+      }
+      const managerAccounts=/^\/v1\/manager\/customers\/([A-Za-z0-9_-]{1,100})\/accounts$/.exec(url.pathname);
+      if(req.method==='GET'&&managerAccounts)
+        return send(res,200,{data:await store.listManagerAccounts(user.uid,managerAccounts[1])},origin);
       const manager=/^\/v1\/manager\/customers\/([A-Za-z0-9_-]{1,100})\/statement-requests$/.exec(url.pathname);
       if(req.method==='POST'&&manager) {
         // Manager grants live only in the administrator-owned database table,
@@ -125,6 +147,8 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
       throw new HttpError(404,'NOT_FOUND','API route not found');
     }catch(error) {
       if(res.headersSent)return;
+      if(error?.name==='SourceNotVerified')
+        return send(res,409,{error:{code:'NOT_VERIFIED',message:'Account is not issuer-verified'}},origin);
       if(error instanceof HttpError)
         return send(res,error.status,{error:{code:error.code,message:error.message}},origin);
       logger.error('Statement API internal error',error?.name||'UnknownError');

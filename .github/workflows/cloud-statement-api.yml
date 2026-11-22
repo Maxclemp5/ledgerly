@@ -29,8 +29,14 @@ jobs:
           node --check src/handler.mjs
           node --check src/main.mjs
           node --check src/repository.mjs
+          node --check src/staticServer.mjs
           node --check src/issuerLedger.mjs
       - name: API, ledger and database configuration tests
         run: npm test
+      - name: Verify React dashboard build
+        run: |
+          cd dashboard
+          npm install --no-audit --no-fund
+          npm run build
       - name: Validate Render Blueprint
         run: ruby -e "require 'yaml'; YAML.load_file('../render.yaml')"

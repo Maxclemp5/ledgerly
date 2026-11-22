@@ -8,3 +8,6 @@ firebase-service-account.json
 *.service-account.json
 credentials.json
 gcp-key.json
+
+dashboard/node_modules
+dashboard/dist
