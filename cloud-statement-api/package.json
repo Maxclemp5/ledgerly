@@ -1,0 +1,17 @@
+{
+  "name": "ledgerdesk-cloud-statement-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "pg": "^8.13.0"
+  }
+}
