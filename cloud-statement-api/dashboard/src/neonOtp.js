@@ -2,7 +2,7 @@
 // emailOTPClient methods; use the documented HTTPS endpoints as a fallback.
 export function createNeonOtp(client,baseUrl,request=globalThis.fetch){
   const base=new URL(baseUrl);
-  if(base.protocol!=='https:'||!base.hostname.endsWith('.neon.tech'))
+  if(base.protocol!=='https:'||(base.origin!==globalThis.location?.origin&&!base.hostname.endsWith('.neon.tech')))
     throw new Error('Neon Auth configuration is invalid');
   const post=async(path,body)=>{
     const url=base.href.replace(/\/+$/,'')+path;
