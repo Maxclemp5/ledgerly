@@ -33,7 +33,7 @@ function PasswordInput({value,onChange,autoComplete,placeholder}){
   </div>;
 }
 
-function ManagerLogin({client,onSignIn}){
+function ManagerLogin({client,authBaseUrl,onSignIn}){
   // No self-registration: manager identities are provisioned by an administrator.
   const [mode,setMode]=useState('login');
   const [email,setEmail]=useState('');
@@ -50,7 +50,7 @@ function ManagerLogin({client,onSignIn}){
     const mail=email.trim().toLowerCase();
     try{
       let result;
-      const neonOtp=createNeonOtp(client);
+      const neonOtp=createNeonOtp(client,authBaseUrl);
       if(mode==='login'){
         result=await client.signIn.email({email:mail,password});
         if(result?.error){
@@ -242,6 +242,7 @@ function ManagerWorkspace({client,session,onSignOut}){
 }
 function App(){
   const [client,setClient]=useState(null);
+  const [authBaseUrl,setAuthBaseUrl]=useState('');
   const [session,setSession]=useState(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
@@ -255,7 +256,7 @@ function App(){
         if(!/^https:\/\//.test(json.authUrl||''))throw new Error('Invalid Neon Auth configuration');
         const c=createAuthClient(json.authUrl,{adapter:BetterAuthReactAdapter()});
         const s=await c.getSession();
-        if(!stopped){setClient(c);setSession(s?.data?.user?s.data:null);}
+        if(!stopped){setClient(c);setAuthBaseUrl(json.authUrl);setSession(s?.data?.user?s.data:null);}
       }catch(e){if(!stopped)setError(e?.message||'Unable to start Manager Portal');}
       finally{if(!stopped)setLoading(false);}
     })();
@@ -274,6 +275,6 @@ function App(){
     <button className="primary-button" onClick={()=>location.reload()}>Retry <RefreshCw size={15}/></button></div>;
   if(!client)return null;
   return session?<ManagerWorkspace client={client} session={session} onSignOut={signOut}/>:
-    <ManagerLogin client={client} onSignIn={signIn}/>;
+    <ManagerLogin client={client} authBaseUrl={authBaseUrl} onSignIn={signIn}/>;
 }
 createRoot(document.getElementById('root')).render(<App/>);
