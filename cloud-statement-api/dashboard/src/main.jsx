@@ -9,6 +9,7 @@ import {
   Building2, Activity, Plus, CalendarDays, Headphones, KeyRound
 } from 'lucide-react';
 import './style.css';
+import {createNeonOtp} from './neonOtp.js';
 import LegacyAdmin,{ManagerPasswordForm} from './LegacyAdmin.jsx';
 
 const API='';
@@ -95,7 +96,7 @@ function AuthScreen({authClient,onAuthenticated}){
         return;
       }
       if(mode==='verify'){
-        result=await authClient.emailOtp.verifyEmail({email:email.trim(),otp:otp.trim()});
+        result=await createNeonOtp(authClient).verifyEmail(email.trim(),otp.trim());
         if(result.error)throw new Error(result.error.message||'Invalid or expired code');
         const login=await authClient.signIn.email({email:email.trim(),password});
         if(login.error){
@@ -107,14 +108,14 @@ function AuthScreen({authClient,onAuthenticated}){
         return;
       }
       if(mode==='forgot'){
-        result=await authClient.emailOtp.requestPasswordReset({email:email.trim()});
+        result=await createNeonOtp(authClient).requestPasswordReset(email.trim());
         if(result.error)throw new Error(result.error.message||'Could not request a reset code');
         changeMode('reset');
         setSuccess('If that email is registered, a password-reset code will arrive shortly.');
         return;
       }
       if(mode==='reset'){
-        result=await authClient.emailOtp.resetPassword({email:email.trim(),otp:otp.trim(),password});
+        result=await createNeonOtp(authClient).resetPassword(email.trim(),otp.trim(),password);
         if(result.error)throw new Error(result.error.message||'Unable to reset password');
         changeMode('login');
         setSuccess('Password updated. Sign in with your new password.');
@@ -123,7 +124,7 @@ function AuthScreen({authClient,onAuthenticated}){
   }
   async function resend(){
     await run(async()=>{
-      const result=await authClient.emailOtp.sendVerificationOtp({email:email.trim(),type:'email-verification'});
+      const result=await createNeonOtp(authClient).sendVerificationOtp(email.trim());
       if(result.error)throw new Error(result.error.message||'Could not resend code');
       setSuccess('A new verification code was sent.');
     });
@@ -159,7 +160,7 @@ function AuthScreen({authClient,onAuthenticated}){
             <label>Email address<input type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required/></label>
             {(mode==='verify'||mode==='reset')&&<label>Verification code<input inputMode="numeric" autoComplete="one-time-code" value={otp} onChange={e=>setOtp(e.target.value)} placeholder="6-digit code" minLength={6} maxLength={10} required/></label>}
             {['login','signup','reset','verify'].includes(mode)&&<label>Password<PasswordField value={password} onChange={setPassword} autoComplete={mode==='signup'||mode==='reset'?'new-password':'current-password'} placeholder={mode==='reset'?'Create a new password':'Enter your password'}/></label>}
-            {mode==='login'&&<div className="forgot-row"><button className="text-link" type="button" onClick={()=>changeMode('forgot')}>Forgot password?</button></div>}
+            {mode==='login'&&<div className="forgot-row"><button className="text-link" type="button" onClick={()=>changeMode('forgot')}>Forgot / set password?</button></div>}
             <button className="primary-button auth-submit" type="submit" disabled={busy}>
               {busy?<RefreshCw className="spinning" size={18}/>:null}
               {mode==='signup'?'Create account':mode==='verify'?'Verify and continue':mode==='forgot'?'Send reset code':mode==='reset'?'Reset password':'Sign in to workspace'}
