@@ -65,7 +65,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
         if(!origin)throw new HttpError(403,'ORIGIN_BLOCKED','Origin not allowed');
         res.writeHead(204,{
           'access-control-allow-origin':origin,
-          'access-control-allow-methods':'GET,POST,OPTIONS',
+          'access-control-allow-methods':'GET,POST,PATCH,OPTIONS',
           'access-control-allow-headers':'Authorization,Content-Type',
           'access-control-max-age':'600','vary':'Origin'
         });
@@ -76,7 +76,8 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
       const user=await principal(req,verify);
       if(req.method==='GET'&&url.pathname==='/v1/me/access'){
         const organizations=await store.listManagerOrganizations(user.uid);
-        return send(res,200,{data:{manager:organizations.length>0,organizations}},origin);
+        const pendingPasswordChange=await store.managerPasswordChangeNeeded?.(user.uid)||false;
+        return send(res,200,{data:{manager:organizations.length>0,organizations,pendingPasswordChange}},origin);
       }
       if(req.method==='GET'&&url.pathname==='/v1/me/accounts')
         return send(res,200,{data:await store.listAccountsForUid(user.uid)},origin);
@@ -123,6 +124,43 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
           throw new HttpError(400,'BAD_QUERY','Enter at least 3 characters of a customer ID');
         return send(res,200,{data:await store.searchManagerCustomers(user.uid,query)},origin);
       }
+      if(req.method==='GET'&&url.pathname==='/v1/manager/managed-customers'){
+        const query=String(url.searchParams.get('query')||'').trim();
+        if(query.length>100||!/^[A-Za-z0-9 _.-]*$/.test(query))
+          throw new HttpError(400,'BAD_QUERY','Invalid customer search');
+        return send(res,200,{data:await store.listManagedCustomers(user.uid,query)},origin);
+      }
+      if(req.method==='POST'&&url.pathname==='/v1/manager/managed-customers'){
+        const data=await readJson(req);
+        const org=input(data,'issuerOrgId',100),displayName=input(data,'displayName',120);
+        const email=data.email==null?'':String(data.email).trim();
+        if(!/^[A-Za-z0-9_-]{1,100}$/.test(org)||
+           displayName.length<2||/[<>\u0000-\u001f]/.test(displayName)||
+           email.length>254||(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)))
+          throw new HttpError(400,'BAD_INPUT','Check customer name, email and organization');
+        const created=await store.createManagedCustomer(user.uid,org,displayName,email);
+        if(!created)throw new HttpError(404,'NOT_FOUND','Issuer access not found');
+        return send(res,201,{data:created},origin);
+      }
+      const managedEdit=/^\/v1\/manager\/managed-customers\/(cust_[a-f0-9]{32})$/.exec(url.pathname);
+      if(req.method==='PATCH'&&managedEdit){
+        const data=await readJson(req),displayName=input(data,'displayName',120);
+        const email=data.email==null?'':String(data.email).trim();
+        if(displayName.length<2||/[<>\u0000-\u001f]/.test(displayName)||
+          email.length>254||(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)))
+          throw new HttpError(400,'BAD_INPUT','Check customer name and email');
+        const changed=await store.updateManagedCustomer(user.uid,managedEdit[1],displayName,email);
+        if(!changed)throw new HttpError(404,'NOT_FOUND','Customer not found');
+        return send(res,200,{data:changed},origin);
+      }
+      const managedArchive=/^\/v1\/manager\/managed-customers\/(cust_[a-f0-9]{32})\/archive$/.exec(url.pathname);
+      if(req.method==='POST'&&managedArchive){
+        const changed=await store.deactivateManagedCustomer(user.uid,managedArchive[1]);
+        if(!changed)throw new HttpError(404,'NOT_FOUND','Customer not found');
+        return send(res,200,{data:changed},origin);
+      }
+      if(req.method==='GET'&&url.pathname==='/v1/manager/audit-logs')
+        return send(res,200,{data:await store.listManagerAudit(user.uid)},origin);
       const managerAccounts=/^\/v1\/manager\/customers\/([A-Za-z0-9_-]{1,100})\/accounts$/.exec(url.pathname);
       if(req.method==='GET'&&managerAccounts)
         return send(res,200,{data:await store.listManagerAccounts(user.uid,managerAccounts[1])},origin);

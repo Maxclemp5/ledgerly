@@ -25,9 +25,18 @@ export class StatementRepository {
       'WHERE l.auth_user_id=$1 AND l.active AND a.id=$2 AND a.active LIMIT 1',[uid,accountId]);
     return r.rows[0]||null;
   }
+  async managerPasswordChangeNeeded(uid){
+    const r=await this.pool.query(
+      'SELECT EXISTS (SELECT 1 FROM manager_authorizations '+
+      'WHERE auth_user_id=$1 AND active AND require_password_change '+
+      'AND NOT public.manager_password_changed_since(auth_user_id,created_at)) AS pending',[uid]);
+    return r.rows[0]?.pending===true;
+  }
   async isManager(authUserId){
     const r=await this.pool.query(
-      'SELECT 1 FROM manager_authorizations WHERE auth_user_id=$1 AND active LIMIT 1',
+      'SELECT 1 FROM manager_authorizations WHERE auth_user_id=$1 AND active '+
+      'AND (NOT require_password_change OR '+
+      'public.manager_password_changed_since(auth_user_id,created_at)) LIMIT 1',
       [authUserId]);
     return Boolean(r.rowCount);
   }
@@ -52,7 +61,9 @@ export class StatementRepository {
   async listManagerOrganizations(uid){
     const result=await this.pool.query(
       'SELECT issuer_org_id AS "issuerOrgId" FROM manager_authorizations '+
-      'WHERE auth_user_id=$1 AND active ORDER BY issuer_org_id LIMIT 20',[uid]);
+      'WHERE auth_user_id=$1 AND active '+
+      'AND (NOT require_password_change OR public.manager_password_changed_since(auth_user_id,created_at)) '+
+      'ORDER BY issuer_org_id LIMIT 20',[uid]);
     return result.rows;
   }
   async getManagerSummary(uid){
@@ -102,6 +113,73 @@ export class StatementRepository {
       'FROM statement_requests r JOIN manager_authorizations m ON m.issuer_org_id=r.issuer_org_id '+
       'AND m.auth_user_id=$1 AND m.active ORDER BY r.created_at DESC LIMIT 50',[uid]);
     return result.rows;
+  }
+
+  // Internal customer intake is separate from issuer-verified accounts.
+  async listManagedCustomers(uid,query=''){
+    const r=await this.pool.query(
+      'SELECT c.customer_id AS "customerId",c.issuer_org_id AS "issuerOrgId",'+
+      'c.display_name AS "displayName",c.email,c.status,c.created_at AS "createdAt" '+
+      'FROM managed_customers c JOIN manager_authorizations m '+
+      'ON m.issuer_org_id=c.issuer_org_id AND m.auth_user_id=$1 AND m.active '+
+      'WHERE c.active AND (LENGTH($2)=0 OR LOWER(c.display_name) LIKE LOWER($2)||\'%\' '+
+      'OR LOWER(c.customer_id) LIKE LOWER($2)||\'%\') '+
+      'ORDER BY c.created_at DESC LIMIT 50',[uid,query]);
+    return r.rows;
+  }
+  async createManagedCustomer(uid,issuerOrgId,displayName,email){
+    const r=await this.pool.query(
+      'WITH created AS ('+
+      'INSERT INTO managed_customers (issuer_org_id,display_name,email,created_by_uid) '+
+      'SELECT m.issuer_org_id,$3,NULLIF($4,\'\'),$1 FROM manager_authorizations m '+
+      'WHERE m.auth_user_id=$1 AND m.issuer_org_id=$2 AND m.active LIMIT 1 '+
+      'RETURNING customer_id,issuer_org_id,display_name,email,status,created_at), '+
+      'logged AS (INSERT INTO manager_audit_events (actor_uid,issuer_org_id,event_type,target_id) '+
+      'SELECT $1,c.issuer_org_id,\'customer.created\',c.customer_id FROM created c RETURNING id) '+
+      'SELECT c.customer_id AS "customerId",c.issuer_org_id AS "issuerOrgId",'+
+      'c.display_name AS "displayName",c.email,c.status,c.created_at AS "createdAt" '+
+      'FROM created c JOIN logged ON TRUE',
+      [uid,issuerOrgId,displayName,email]);
+    return r.rows[0]||null;
+  }
+  async updateManagedCustomer(uid,customerId,displayName,email){
+    const r=await this.pool.query(
+      'WITH changed AS ('+
+      'UPDATE managed_customers c SET display_name=$3,email=NULLIF($4,\'\'),updated_at=now() '+
+      'WHERE c.customer_id=$2 AND c.active AND EXISTS ('+
+      'SELECT 1 FROM manager_authorizations m WHERE m.auth_user_id=$1 '+
+      'AND m.issuer_org_id=c.issuer_org_id AND m.active) '+
+      'RETURNING c.customer_id,c.issuer_org_id,c.display_name,c.email,c.status,c.created_at), '+
+      'logged AS (INSERT INTO manager_audit_events (actor_uid,issuer_org_id,event_type,target_id) '+
+      'SELECT $1,c.issuer_org_id,\'customer.updated\',c.customer_id FROM changed c RETURNING id) '+
+      'SELECT c.customer_id AS "customerId",c.issuer_org_id AS "issuerOrgId",'+
+      'c.display_name AS "displayName",c.email,c.status,c.created_at AS "createdAt" '+
+      'FROM changed c JOIN logged ON TRUE',
+      [uid,customerId,displayName,email]);
+    return r.rows[0]||null;
+  }
+  async deactivateManagedCustomer(uid,customerId){
+    const r=await this.pool.query(
+      'WITH changed AS ('+
+      'UPDATE managed_customers c SET active=false,updated_at=now() '+
+      'WHERE c.customer_id=$2 AND c.active AND EXISTS ('+
+      'SELECT 1 FROM manager_authorizations m WHERE m.auth_user_id=$1 '+
+      'AND m.issuer_org_id=c.issuer_org_id AND m.active) '+
+      'RETURNING c.customer_id,c.issuer_org_id), '+
+      'logged AS (INSERT INTO manager_audit_events (actor_uid,issuer_org_id,event_type,target_id) '+
+      'SELECT $1,c.issuer_org_id,\'customer.archived\',c.customer_id FROM changed c RETURNING id) '+
+      'SELECT c.customer_id AS "customerId" FROM changed c JOIN logged ON TRUE',
+      [uid,customerId]);
+    return r.rows[0]||null;
+  }
+  async listManagerAudit(uid){
+    const r=await this.pool.query(
+      'SELECT a.event_type AS "eventType",a.target_id AS "targetId",'+
+      'a.issuer_org_id AS "issuerOrgId",a.created_at AS "createdAt" '+
+      'FROM manager_audit_events a JOIN manager_authorizations m '+
+      'ON m.issuer_org_id=a.issuer_org_id AND m.auth_user_id=$1 AND m.active '+
+      'ORDER BY a.created_at DESC LIMIT 50',[uid]);
+    return r.rows;
   }
   async createRequest({requesterUid,customerId,accountId,issuerOrgId,from,to}){
     // One atomic statement: the restricted runtime role needs SELECT+INSERT only.

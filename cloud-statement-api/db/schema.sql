@@ -58,6 +58,51 @@ CREATE TABLE IF NOT EXISTS manager_authorizations (
 CREATE INDEX IF NOT EXISTS manager_authorizations_by_org_idx
   ON manager_authorizations(issuer_org_id) WHERE active;
 
+
+-- Internal customer intake: never represented as issuer-verified bank records.
+CREATE TABLE IF NOT EXISTS managed_customers (
+  customer_id text PRIMARY KEY DEFAULT ('cust_' || replace(gen_random_uuid()::text,'-','')),
+  issuer_org_id text NOT NULL,
+  display_name text NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 120),
+  email text,
+  status text NOT NULL DEFAULT 'unverified' CHECK(status='unverified'),
+  created_by_uid text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  active boolean NOT NULL DEFAULT true
+);
+CREATE INDEX IF NOT EXISTS managed_customers_issuer_idx ON managed_customers(issuer_org_id,created_at DESC) WHERE active;
+CREATE TABLE IF NOT EXISTS manager_audit_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_uid text NOT NULL,
+  issuer_org_id text NOT NULL,
+  event_type text NOT NULL CHECK(event_type IN ('customer.created','customer.updated','customer.archived')),
+  target_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS manager_audit_issuer_idx ON manager_audit_events(issuer_org_id,created_at DESC);
+
+
+-- A manager granted access with a provisional password must change it after
+-- the grant timestamp before any manager API becomes usable.
+ALTER TABLE public.manager_authorizations
+  ADD COLUMN IF NOT EXISTS require_password_change boolean NOT NULL DEFAULT true;
+
+-- The app role must never read Neon Auth password hashes. A SECURITY DEFINER
+-- boolean-only check compares the credential-account update timestamp.
+CREATE OR REPLACE FUNCTION public.manager_password_changed_since(p_uid text,p_since timestamptz)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $
+  SELECT EXISTS (
+    SELECT 1 FROM neon_auth.account a
+    WHERE a."userId"::text=p_uid
+      AND a."providerId"='credential'
+      AND a.password IS NOT NULL
+      AND a."updatedAt" > p_since
+  )
+$;
+REVOKE ALL ON FUNCTION public.manager_password_changed_since(text,timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.manager_password_changed_since(text,timestamptz) TO ledgerly_api_runtime;
+
 -- Grants to apply separately as a privileged database administrator:
 -- GRANT SELECT ON customer_identity_links, verified_accounts, manager_authorizations TO ledgerly_api_runtime;
 -- GRANT SELECT, INSERT ON statement_requests TO ledgerly_api_runtime;
