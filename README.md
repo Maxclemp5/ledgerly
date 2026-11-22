@@ -1,29 +1,32 @@
-# Ledgerly OpenPDF Statement Studio
+# Ledgerly
 
-Java 17 + OpenPDF 1.3.35 sample statement generator, hosted on Railway.
+Ledgerly is being migrated to a Google Cloud production architecture.
 
-**DEMO ONLY**: This application uses user-entered fictional data. Documents are prominently labeled as samples and are not bank-issued records or valid financial verification.
+## Active backend workspace
 
-## Endpoints
-- `GET /` interactive HTML statement editor
-- `GET /health` health check
-- `POST /api/statement.pdf` (application/x-www-form-urlencoded) downloadable PDF
+The current backend work lives in [`cloud-statement-api/`](./cloud-statement-api/).
 
-## Local run
-Install Java 17 and Maven.
-```sh
-mvn -B package
-java -jar target/ledgerly-openpdf-1.0.0.jar
-```
-Then browse to http://localhost:8080.
+It contains:
+- Firebase Authentication token verification
+- Customer-scoped account and statement-request APIs
+- Organization-scoped manager request authorization
+- PostgreSQL schema and repository layer
+- An issuer-ledger connector contract with exact balance reconciliation tests
+- A Cloud Run container and deployment guidance
 
-## Railway
-The root Dockerfile builds Maven artifacts and runs the JAR. Railway detects `PORT` at runtime. Health check: `/health`.
+## Production status
 
-## Verification
-Open a generated statement's PDF Properties > Producer, or run `pdfinfo yourfile.pdf`.
-Expect OpenPDF library producer metadata once built against OpenPDF 1.3.35.
-The precise producer string is verified only by inspecting the deployed output.
+This repository does **not** currently connect to a real bank/core-banking provider and does **not** issue official bank statements. The API accepts authorized statement requests and keeps PDF download disabled until the institution's real ledger, approval, signing, and secure delivery integrations are configured.
 
-## Before processing real financial data
-Use authenticated backend ledger records, authorization checks, audit trails, verified opening and closing balances, document retention controls, and privacy/security review. Never trust browser-provided balances as authoritative.
+## Legacy renderer
+
+The previous Java/OpenPDF demo renderer, sample templates, and Railway build/deployment files have been removed from the current source tree. They are not part of the Google Cloud deployment path.
+
+See [`cloud-statement-api/README.md`](./cloud-statement-api/README.md) for the integration and deployment checklist.
+
+## Security
+
+- Do not commit customer PII, account data, issuer templates, API tokens, or private keys.
+- Keep production credentials in Google Secret Manager.
+- Use separate least-privilege identities for the API, ledger connector, and issuer signing worker.
+- Review repository visibility and Git history before placing any sensitive material in source control.
