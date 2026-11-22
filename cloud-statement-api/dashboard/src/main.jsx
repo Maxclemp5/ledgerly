@@ -52,7 +52,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
       let result;
       const neonOtp=createNeonOtp(client,authBaseUrl);
       if(mode==='login'){
-        result=await client.signIn.email({email:mail,password});
+        result=await neonOtp.signInWithEmail(mail,password);
         if(result?.error){
           if(/verif/i.test(result.error.code||'')||/verif/i.test(result.error.message||'')){
             navigate('verify-request');
@@ -170,7 +170,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
 
 function useManagerApi(client,onUnauthorized){
   return useCallback(async(path,options={})=>{
-    const token=await client.token();
+    const token=await (client.token?.() ?? client.auth?.token?.());
     const jwt=token?.data?.token;
     if(token?.error||!jwt){onUnauthorized();throw new Error('Session expired. Please sign in again.');}
     const response=await fetch(path,{
@@ -255,7 +255,7 @@ function App(){
         const json=await r.json();
         if(!/^https:\/\//.test(json.authUrl||''))throw new Error('Invalid Neon Auth configuration');
         const c=createAuthClient(json.authUrl,{adapter:BetterAuthReactAdapter()});
-        const s=await c.getSession();
+        const s=await (c.getSession?.() ?? c.auth?.getSession?.());
         if(!stopped){setClient(c);setAuthBaseUrl(json.authUrl);setSession(s?.data?.user?s.data:null);}
       }catch(e){if(!stopped)setError(e?.message||'Unable to start Manager Portal');}
       finally{if(!stopped)setLoading(false);}
@@ -263,10 +263,10 @@ function App(){
     return()=>{stopped=true};
   },[]);
   const signOut=useCallback(async()=>{
-    try{await client?.signOut();}finally{setSession(null);}
+    try{await (client?.signOut?.() ?? client?.auth?.signOut?.());}finally{setSession(null);}
   },[client]);
   const signIn=async()=>{
-    const result=await client.getSession();
+    const result=await (client.getSession?.() ?? client.auth?.getSession?.());
     if(!result?.data?.user)throw new Error('No verified manager session was established');
     setSession(result.data);
   };
