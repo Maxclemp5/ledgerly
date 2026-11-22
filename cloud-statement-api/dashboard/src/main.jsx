@@ -113,7 +113,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
   }[mode];
   return <div className="auth-layout">
     <aside className="auth-illustration">
-      <div className="auth-top"><Brand/><span className="auth-pill"><span className="live-light"/> DEVELOPMENT ENVIRONMENT</span></div>
+      <div className="auth-top"><Brand/><span className="auth-pill"><span className="live-light"/> ORGANIZATION PORTAL</span></div>
       <div className="auth-pitch">
         <span className="eyebrow bright">LEDGER DESK / ORGANIZATIONS</span>
         <h1>One secure place.<br/><em>For your team.</em></h1>
@@ -125,7 +125,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
           <div><strong>Manager accounts only</strong><small>No public registration or customer login. Customer identities belong to a separate Ledger API module.</small></div>
         </div>
       </div>
-      <div className="auth-footer">LEDGER DESK <span>•</span> MANAGER PORTAL <span>•</span> TEST ENVIRONMENT</div>
+      <div className="auth-footer">LEDGER DESK <span>•</span> MANAGER PORTAL <span>•</span> NSAVE ORGANIZATION</div>
     </aside>
     <main className="auth-panel"><div className="auth-panel-inner">
       <div className="auth-mobile-brand"><Brand/></div>
@@ -161,7 +161,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
             <button className="text-link" type="button" onClick={()=>navigate('verify-request')}>Verify manager email</button>
           </>:<button className="text-link" type="button" onClick={()=>navigate('login')}>Back to manager sign in</button>}
         </div>
-        <p className="auth-disclaimer"><LockKeyhole size={13}/> Development environment. External Ledger API integration is pending.</p>
+        <p className="auth-disclaimer"><LockKeyhole size={13}/> nSave organizational access. Ledger API connection will be enabled after approved credentials and documentation are supplied.</p>
       </div>
     </div></main>
   </div>;
