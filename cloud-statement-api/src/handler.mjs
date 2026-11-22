@@ -106,13 +106,13 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
       }
       const manager=/^\/v1\/manager\/customers\/([A-Za-z0-9_-]{1,100})\/statement-requests$/.exec(url.pathname);
       if(req.method==='POST'&&manager) {
-        // Claims must be issued server-side by a trusted organization IAM administrator.
-        const org=user.claims?.issuer_org_id;
-        if(user.claims?.statement_manager!==true||typeof org!=='string'||!org)
+        // Manager grants live only in the administrator-owned database table,
+        // not in client-provided claims, JWT profile fields, or request bodies.
+        if(!await store.isManager(user.uid))
           throw new HttpError(403,'FORBIDDEN','Organization manager access required');
         const data=await readJson(req),accountId=input(data,'accountId',100),period=validPeriod(data);
         if(!/^[a-zA-Z0-9_-]{1,100}$/.test(accountId))throw new HttpError(400,'BAD_ACCOUNT','Invalid account ID');
-        const account=await store.findAccountForManager(manager[1],accountId,org);
+        const account=await store.findAccountForManager(manager[1],accountId,user.uid);
         if(!account)throw new HttpError(404,'NOT_FOUND','Account not found');
         if(account.verification_status!=='verified')
           throw new HttpError(409,'NOT_VERIFIED','Account is not issuer-verified');

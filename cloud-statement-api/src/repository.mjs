@@ -7,7 +7,7 @@ export class StatementRepository {
       'SELECT a.id,a.masked_number AS "maskedNumber",a.currency,a.display_name AS "displayName",'+
       'a.verification_status AS "verificationStatus" '+
       'FROM verified_accounts a JOIN customer_identity_links l ON l.customer_id=a.customer_id '+
-      'WHERE l.firebase_uid=$1 AND l.active AND a.active ORDER BY a.display_name LIMIT 100',[uid]);
+      'WHERE l.auth_user_id=$1 AND l.active AND a.active ORDER BY a.display_name LIMIT 100',[uid]);
     return result.rows;
   }
   async listRequestsForUid(uid){
@@ -15,21 +15,30 @@ export class StatementRepository {
       'SELECT r.id,r.account_id AS "accountId",r.period_start AS "from",'+
       'r.period_end AS "to",r.status,r.created_at AS "createdAt" '+
       'FROM statement_requests r JOIN customer_identity_links l ON l.customer_id=r.customer_id '+
-      'WHERE l.firebase_uid=$1 AND l.active ORDER BY r.created_at DESC LIMIT 100',[uid]);
+      'WHERE l.auth_user_id=$1 AND l.active ORDER BY r.created_at DESC LIMIT 100',[uid]);
     return result.rows;
   }
   async findAccountForUid(uid,accountId){
     const r=await this.pool.query(
       'SELECT a.id,a.customer_id,a.issuer_org_id,a.verification_status '+
       'FROM verified_accounts a JOIN customer_identity_links l ON l.customer_id=a.customer_id '+
-      'WHERE l.firebase_uid=$1 AND l.active AND a.id=$2 AND a.active LIMIT 1',[uid,accountId]);
+      'WHERE l.auth_user_id=$1 AND l.active AND a.id=$2 AND a.active LIMIT 1',[uid,accountId]);
     return r.rows[0]||null;
   }
-  async findAccountForManager(customerId,accountId,issuerOrgId){
+  async isManager(authUserId){
     const r=await this.pool.query(
-      'SELECT id,customer_id,issuer_org_id,verification_status FROM verified_accounts '+
-      'WHERE customer_id=$1 AND id=$2 AND issuer_org_id=$3 AND active LIMIT 1',
-      [customerId,accountId,issuerOrgId]);
+      'SELECT 1 FROM manager_authorizations WHERE auth_user_id=$1 AND active LIMIT 1',
+      [authUserId]);
+    return Boolean(r.rowCount);
+  }
+  async findAccountForManager(customerId,accountId,authUserId){
+    // The issuer scope comes from an administrator-managed grant, never a token claim.
+    const r=await this.pool.query(
+      'SELECT a.id,a.customer_id,a.issuer_org_id,a.verification_status '+
+      'FROM verified_accounts a JOIN manager_authorizations m '+
+      'ON m.issuer_org_id=a.issuer_org_id AND m.auth_user_id=$3 AND m.active '+
+      'WHERE a.customer_id=$1 AND a.id=$2 AND a.active LIMIT 1',
+      [customerId,accountId,authUserId]);
     return r.rows[0]||null;
   }
   async getRequestForUid(uid,requestId){
@@ -37,7 +46,7 @@ export class StatementRepository {
       'SELECT r.id,r.account_id AS "accountId",r.period_start AS "from",'+
       'r.period_end AS "to",r.status,r.created_at AS "createdAt" '+
       'FROM statement_requests r JOIN customer_identity_links l ON l.customer_id=r.customer_id '+
-      'WHERE l.firebase_uid=$1 AND l.active AND r.id=$2 LIMIT 1',[uid,requestId]);
+      'WHERE l.auth_user_id=$1 AND l.active AND r.id=$2 LIMIT 1',[uid,requestId]);
     return r.rows[0]||null;
   }
   async createRequest({requesterUid,customerId,accountId,issuerOrgId,from,to}){
