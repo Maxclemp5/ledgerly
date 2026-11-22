@@ -4,11 +4,11 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS customer_identity_links (
-  firebase_uid text NOT NULL,
+  auth_user_id text NOT NULL,
   customer_id text NOT NULL,
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY(firebase_uid,customer_id)
+  PRIMARY KEY(auth_user_id,customer_id)
 );
 CREATE INDEX IF NOT EXISTS customer_identity_link_customer_idx
   ON customer_identity_links(customer_id) WHERE active;
@@ -46,8 +46,20 @@ CREATE TABLE IF NOT EXISTS statement_requests (
 CREATE INDEX IF NOT EXISTS statement_requests_customer_idx
   ON statement_requests(customer_id,created_at DESC);
 
--- Permissions to apply separately as the Cloud SQL administrator:
--- GRANT SELECT ON customer_identity_links, verified_accounts TO statement_api;
--- GRANT SELECT, INSERT ON statement_requests TO statement_api;
+-- Manager authorization is granted only by a trusted database administrator.
+-- The API role can SELECT grants but must never INSERT, UPDATE or DELETE them.
+CREATE TABLE IF NOT EXISTS manager_authorizations (
+  auth_user_id text NOT NULL,
+  issuer_org_id text NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(auth_user_id, issuer_org_id)
+);
+CREATE INDEX IF NOT EXISTS manager_authorizations_by_org_idx
+  ON manager_authorizations(issuer_org_id) WHERE active;
+
+-- Grants to apply separately as a privileged database administrator:
+-- GRANT SELECT ON customer_identity_links, verified_accounts, manager_authorizations TO ledgerly_api_runtime;
+-- GRANT SELECT, INSERT ON statement_requests TO ledgerly_api_runtime;
 -- The issuer worker has separate, narrowly-scoped UPDATE/SELECT roles.
--- Never grant statement_api UPDATE on verified_accounts or ISSUED status.
+-- Never grant ledgerly_api_runtime UPDATE on verified_accounts or ISSUED status.

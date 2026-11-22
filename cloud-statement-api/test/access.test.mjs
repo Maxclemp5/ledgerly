@@ -10,8 +10,9 @@ function fixture(){
     async listAccountsForUid(uid){return uid==='alice'?[{id:'acc_001',maskedNumber:'****1111'}]:[]},
     async listRequestsForUid(){return []},
     async findAccountForUid(uid,id){return uid==='alice'&&id==='acc_001'?account:null},
-    async findAccountForManager(customer,id,org){
-      return customer==='customer_a'&&id==='acc_001'&&org==='issuer_a'?account:null;
+    async isManager(uid){return uid==='manager_a'||uid==='manager_b'}, 
+    async findAccountForManager(customer,id,uid){
+      return customer==='customer_a'&&id==='acc_001'&&uid==='manager_a'?account:null;
     },
     async createRequest(data){return {id:uuid,accountId:data.accountId,status:'PENDING_ISSUER'}},
     async getRequestForUid(uid,id){
@@ -21,8 +22,9 @@ function fixture(){
 }
 async function verify(token){
   if(token==='alice'||token==='bob')return {uid:token,claims:{}};
-  if(token==='manager_a')return {uid:'manager_a',claims:{statement_manager:true,issuer_org_id:'issuer_a'}};
-  if(token==='manager_b')return {uid:'manager_b',claims:{statement_manager:true,issuer_org_id:'issuer_b'}};
+  if(token==='manager_a')return {uid:'manager_a'};
+  if(token==='manager_b')return {uid:'manager_b'};
+  if(token==='forged_manager')return {uid:'forged_manager',claims:{statement_manager:true,issuer_org_id:'issuer_a'}};
   throw new Error('invalid token');
 }
 async function withServer(fn){
@@ -63,6 +65,7 @@ test('manager must have trusted issuer-scoped role',async()=>{
   await withServer(async base=>{
     const path='/v1/manager/customers/customer_a/statement-requests';
     assert.equal((await post(base,path,'alice',body)).status,403);
+    assert.equal((await post(base,path,'forged_manager',body)).status,403);
     assert.equal((await post(base,path,'manager_b',body)).status,404);
     assert.equal((await post(base,path,'manager_a',body)).status,202);
   });
