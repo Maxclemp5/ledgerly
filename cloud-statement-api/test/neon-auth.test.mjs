@@ -28,8 +28,10 @@ test('rejects wrong issuer and expired tokens',async()=>{
 test('rejects modified or unsigned tokens',async()=>{
   const {verify,sign}=await fixture();
   const token=await sign();
-  await assert.rejects(verify(token.slice(0,-1)+(token.slice(-1)==='a'?'b':'a')));
-  await assert.rejects(verify('unsigned')));
+  const parts=token.split('.');
+  parts[1]=(parts[1][0]==='a'?'b':'a')+parts[1].slice(1);
+  await assert.rejects(verify(parts.join('.')));
+  await assert.rejects(verify('unsigned'));
 });
 test('rejects misconfigured JWKS and insecure auth URL',async()=>{
   assert.throws(()=>createNeonVerifier({baseUrl:'http://testing.neonauth.aws.neon.tech/auth',jwksUrl}));
