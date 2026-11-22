@@ -170,7 +170,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
 
 function useManagerApi(client,onUnauthorized){
   return useCallback(async(path,options={})=>{
-    const token=await (client.token?.() ?? client.auth?.token?.());
+    const token=await client.token();
     const jwt=token?.data?.token;
     if(token?.error||!jwt){onUnauthorized();throw new Error('Session expired. Please sign in again.');}
     const response=await fetch(path,{
@@ -254,20 +254,22 @@ function App(){
         if(!r.ok)throw new Error('Unable to load manager authentication configuration');
         const json=await r.json();
         if(!/^https:\/\//.test(json.authUrl||''))throw new Error('Invalid Neon Auth configuration');
-        const c=createAuthClient(json.authUrl,{adapter:BetterAuthReactAdapter()});
-        const s=await (c.getSession?.() ?? c.auth?.getSession?.());
-        if(!stopped){setClient(c);setAuthBaseUrl(json.authUrl);setSession(s?.data?.user?s.data:null);}
+        const proxyUrl=new URL(json.authProxyUrl||'/auth',window.location.origin).href.replace(/\/$/,'');
+        const c=createAuthClient(proxyUrl,{adapter:BetterAuthReactAdapter()});
+        const s=await c.getSession();
+        if(!stopped){setClient(c);setAuthBaseUrl(proxyUrl);setSession(s?.data?.user?s.data:null);}
       }catch(e){if(!stopped)setError(e?.message||'Unable to start Manager Portal');}
       finally{if(!stopped)setLoading(false);}
     })();
     return()=>{stopped=true};
   },[]);
   const signOut=useCallback(async()=>{
-    try{await (client?.signOut?.() ?? client?.auth?.signOut?.());}finally{setSession(null);}
+    try{await client?.signOut?.();}finally{setSession(null);}
   },[client]);
   const signIn=async()=>{
-    const result=await (client.getSession?.() ?? client.auth?.getSession?.());
-    if(!result?.data?.user)throw new Error('No verified manager session was established');
+    const result=await client.getSession();
+    if(result?.error)throw new Error(result.error.message||'Unable to read manager session');
+    if(!result?.data?.user)throw new Error('Authentication succeeded but browser session was not established. Enable cookies for this site and try again.');
     setSession(result.data);
   };
   if(loading)return <div className="boot-screen"><Brand/><RefreshCw size={24} className="spinning"/> Loading Manager Portal…</div>;
