@@ -53,7 +53,7 @@ async function principal(req,verify) {
     return p;
   }catch {throw new HttpError(401,'AUTH_REQUIRED','Session invalid or revoked')}
 }
-export function createHandler({verify,store,allowedOrigin='',logger=console}) {
+export function createHandler({verify,store,allowedOrigin='',logger=console,enableCustomerModule=false}) {
   if(typeof verify!=='function'||!store)throw new TypeError('Verification and storage required');
   return async (req,res)=>{
     const origin=allowedOrigin&&req.headers.origin===allowedOrigin?allowedOrigin:'';
@@ -79,6 +79,10 @@ export function createHandler({verify,store,allowedOrigin='',logger=console}) {
         const pendingPasswordChange=await store.managerPasswordChangeNeeded?.(user.uid)||false;
         return send(res,200,{data:{manager:organizations.length>0,organizations,pendingPasswordChange}},origin);
       }
+      // The legacy customer API belongs to a future independent Ledger API module.
+      // In this organization-level Manager portal it remains disabled by default.
+      if(!enableCustomerModule&&url.pathname.startsWith('/v1/me/'))
+        throw new HttpError(404,'NOT_FOUND','Customer module is not available on this service');
       if(req.method==='GET'&&url.pathname==='/v1/me/accounts')
         return send(res,200,{data:await store.listAccountsForUid(user.uid)},origin);
       if(req.method==='GET'&&url.pathname==='/v1/me/statement-requests')

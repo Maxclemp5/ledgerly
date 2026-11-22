@@ -23,6 +23,11 @@ test('SPA routes and same-origin assets are served with security headers',async(
     assert.equal(page.status,200);
     assert.match(await page.text(),/Dashboard/);
     assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+    for(const retired of ['/customer','/signup','/register']){
+      const blocked=await fetch(base+retired);
+      assert.equal(blocked.status,404);
+      assert.match(await blocked.text(),/Customer module not hosted here/);
+    }
     const asset=await fetch(base+'/assets/main.js');
     assert.equal(asset.status,200);
     assert.match(asset.headers.get('content-type'),/javascript/);

@@ -248,3 +248,13 @@ label+label{margin-top:17px}
   .brand-wordmark strong{font-size:18px}
 }
 @media(prefers-reduced-motion:reduce){.spinning{animation:none}*,*:before,*:after{transition:none!important}}
+
+/* Manager-only organization portal: no public audience switch or signup */
+.manager-login-note{margin:28px 0 24px;padding:13px 15px;background:#f7f9fa;border:1px solid #e8edf1;border-radius:11px;display:flex;align-items:flex-start;gap:11px;color:#c8102e}
+.manager-login-note svg{flex:0 0 auto;margin-top:1px}
+.manager-login-note div{display:flex;flex-direction:column;gap:5px}
+.manager-login-note strong{font-size:12px;color:#343c46}
+.manager-login-note small{font-size:11px;color:#8a95a3;line-height:1.5}
+.manager-auth-links{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:22px;padding-top:22px;border-top:1px solid #eef0f3}
+.manager-auth-links .text-link{font-size:12px}
+@media(max-width:400px){.manager-auth-links{flex-direction:column;align-items:flex-start}}
