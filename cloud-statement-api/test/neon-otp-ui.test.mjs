@@ -22,3 +22,24 @@ test('OTP fallback returns actual provider errors',async()=>{
   const result=await otp.requestPasswordReset('someone@example.test');
   assert.equal(result.error.status,429);
 });
+
+test('email sign-in uses direct Neon Auth endpoint if installed adapter lacks signIn.email',async()=>{
+  const requests=[];
+  const otp=createNeonOtp({getSession(){}},origin,async(url,options)=>{
+    requests.push({url,options});
+    return new Response(JSON.stringify({user:{email:'manager@example.test'}}),{status:200});
+  });
+  const result=await otp.signInWithEmail('manager@example.test','example-password');
+  assert.equal(result.error,null);
+  assert.equal(requests[0].url,origin+'/sign-in/email');
+  assert.equal(JSON.parse(requests[0].options.body).email,'manager@example.test');
+  assert.equal(requests[0].options.credentials,'include');
+});
+test('email sign-in keeps the SDK method when present',async()=>{
+  let called=false;
+  const client={signIn:{email:async({email})=>{called=true;return {data:{email},error:null}}}};
+  const otp=createNeonOtp(client,origin,async()=>{throw Error('Unexpected fallback')});
+  const result=await otp.signInWithEmail('manager@example.test','example-password');
+  assert.equal(called,true);
+  assert.equal(result.data.email,'manager@example.test');
+});
