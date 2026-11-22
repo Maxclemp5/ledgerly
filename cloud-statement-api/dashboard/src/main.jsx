@@ -1,7 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {createAuthClient} from '@neon/auth';
-import {BetterAuthReactAdapter} from '@neon/auth/react/adapters';
+import {createManagerAuthClient} from './managerAuthClient.js';
 import {
   ArrowRight,CheckCircle2,ChevronRight,CircleAlert,Eye,EyeOff,
   KeyRound,LockKeyhole,LogOut,Menu,RefreshCw,ShieldCheck,X
@@ -255,7 +254,7 @@ function App(){
         const json=await r.json();
         if(!/^https:\/\//.test(json.authUrl||''))throw new Error('Invalid Neon Auth configuration');
         const proxyUrl=new URL(json.authProxyUrl||'/auth',window.location.origin).href.replace(/\/$/,'');
-        const c=createAuthClient(proxyUrl,{adapter:BetterAuthReactAdapter()});
+        const c=createManagerAuthClient(proxyUrl);
         const s=await c.getSession();
         if(!stopped){setClient(c);setAuthBaseUrl(proxyUrl);setSession(s?.data?.user?s.data:null);}
       }catch(e){if(!stopped)setError(e?.message||'Unable to start Manager Portal');}
