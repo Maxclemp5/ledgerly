@@ -30,6 +30,13 @@ export function createNeonOtp(client,baseUrl,request=globalThis.fetch){
     return {data,error:null};
   };
   return {
+    async signInWithEmail(email,password){
+      const signIn=client?.signIn?.email||client?.auth?.signIn?.email;
+      if(typeof signIn==='function')return signIn({email,password});
+      // SDK compatibility fallback for versions where the signIn namespace
+      // is not surfaced by the installed Neon Auth adapter.
+      return post('/sign-in/email',{email,password});
+    },
     async requestPasswordReset(email){
       if(typeof client?.emailOtp?.requestPasswordReset==='function')
         return client.emailOtp.requestPasswordReset({email});
