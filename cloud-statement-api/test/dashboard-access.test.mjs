@@ -18,6 +18,7 @@ function fixture(){
       return uid==='manager_a'?[{issuerOrgId:'issuer_a'}]:uid==='manager_b'?[{issuerOrgId:'issuer_b'}]:[];
     },
     async isManager(uid){return ['manager_a','manager_b'].includes(uid)},
+    async managerPasswordChangeNeeded(uid){return uid==='onboarding_manager'},
     async getManagerSummary(uid){return uid==='manager_a'?{customers:1,verifiedAccounts:1,totalRequests:1,pendingRequests:1}:{customers:0,verifiedAccounts:0,totalRequests:0,pendingRequests:0}},
     async searchManagerCustomers(uid,q){return uid==='manager_a'&&'customer_a'.startsWith(q)?[{customerId:'customer_a',accountCount:1,verifiedCount:1}]:[]},
     async listManagerAccounts(uid,id){return uid==='manager_a'&&id==='customer_a'?[validAccount]:[]},
@@ -27,7 +28,7 @@ function fixture(){
   };
 }
 async function verify(token){
-  if(['manager_a','manager_b','alice','attacker'].includes(token))
+  if(['manager_a','manager_b','alice','attacker','onboarding_manager'].includes(token))
     return {uid:token,claims:{statement_manager:true,issuer_org_id:'issuer_a'}};
   throw new Error('invalid token');
 }
@@ -42,10 +43,10 @@ test('access endpoint reflects authoritative database grants, not JWT roles',asy
   await withServer(async base=>{
     let r=await fetch(base+'/v1/me/access',{headers:auth('attacker')});
     assert.equal(r.status,200);
-    assert.deepEqual((await r.json()).data,{manager:false,organizations:[]});
+    assert.deepEqual((await r.json()).data,{manager:false,organizations:[],pendingPasswordChange:false});
     r=await fetch(base+'/v1/me/access',{headers:auth('manager_a')});
     assert.equal(r.status,200);
-    assert.deepEqual((await r.json()).data,{manager:true,organizations:[{issuerOrgId:'issuer_a'}]});
+    assert.deepEqual((await r.json()).data,{manager:true,organizations:[{issuerOrgId:'issuer_a'}],pendingPasswordChange:false});
   });
 });
 test('every manager read route blocks customer with forged claims',async()=>{
@@ -134,4 +135,16 @@ test('unverified or revoked account cannot create statement request',async()=>{
     requesterUid:'manager_a',customerId:'customer_a',
     accountId:'acc_001',issuerOrgId:'issuer_a',from:'2026-10-01',to:'2026-10-31'
   }),{name:'SourceNotVerified'});
+});
+
+test('manager first login reports pending password rotation without manager privileges',async()=>{
+  await withServer(async base=>{
+    const r=await fetch(base+'/v1/me/access',{headers:auth('onboarding_manager')});
+    assert.equal(r.status,200);
+    const payload=(await r.json()).data;
+    assert.equal(payload.manager,false);
+    assert.equal(payload.pendingPasswordChange,true);
+    const restricted=await fetch(base+'/v1/manager/summary',{headers:auth('onboarding_manager')});
+    assert.equal(restricted.status,403);
+  });
 });

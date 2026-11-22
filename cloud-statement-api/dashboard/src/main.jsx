@@ -9,6 +9,7 @@ import {
   Building2, Activity, Plus, CalendarDays, Headphones, KeyRound
 } from 'lucide-react';
 import './style.css';
+import LegacyAdmin,{ManagerPasswordForm} from './LegacyAdmin.jsx';
 
 const API='';
 const blankForm={accountId:'',from:'',to:''};
@@ -358,7 +359,7 @@ function DashboardShell({authClient,session,onSignOut,initialRole,onSessionExpir
     api('/v1/me/access').then(v=>{
       if(cancelled)return;
       setAccess(v);
-      if(initialRole==='manager'&&!v.manager)setError('Manager access has not been assigned to this account. An authorized administrator must grant access.');
+      if(initialRole==='manager'&&!v.manager&&!v.pendingPasswordChange)setError('Manager access has not been assigned to this account. An authorized administrator must grant access.');
     }).catch(e=>{if(!cancelled)setError(e.message);}).finally(()=>{if(!cancelled)setBusy(false);});
     return()=>{cancelled=true;};
   },[api,initialRole]);
@@ -400,8 +401,12 @@ function DashboardShell({authClient,session,onSignOut,initialRole,onSessionExpir
       <div className="main-content">
         <Notice message={error} onClose={()=>setError('')}/>
         {busy?<div className="page-loading"><RefreshCw className="spinning"/> Checking access permissions…</div>:
+         role==='manager'&&!manager&&access?.pendingPasswordChange?
+         <ManagerPasswordForm mandatory authClient={authClient} onSuccess={async()=>{
+           const v=await api('/v1/me/access');setAccess(v);setError('');
+         }}/>:
          role==='manager'&&!manager?<section className="surface-card access-denied"><ShieldCheck size={32}/><h1>Manager authorization required</h1><p>This account has no active manager grant. An administrator must assign issuer-scoped permissions. Registering or choosing “Manager” does not grant access.</p><button className="primary-button" onClick={()=>navigate('customer')}>Open customer workspace <ArrowRight size={17}/></button></section>:
-         role==='manager'?<ManagerDashboard api={api} organizations={access?.organizations||[]} refreshKey={refreshKey}/>:
+         role==='manager'?<LegacyAdmin api={api} authClient={authClient} session={session} organizations={access?.organizations||[]} refreshKey={refreshKey}/>:
          <CustomerDashboard api={api} refreshKey={refreshKey}/>}
         <footer className="page-footer"><span>© Ledger Desk · Development workspace</span><span><LockKeyhole size={13}/> No live banking integration or official PDF issuance</span></footer>
       </div>
