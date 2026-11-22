@@ -1,38 +1,48 @@
-# Ledger Desk Java Demo PDF Renderer
+# Ledger Desk: Java demo PDF renderer
 
-Protected Java 17 and OpenPDF 2.0.5 microservice for rendering unofficial customer account activity summaries.
+Java 17 + OpenPDF 2.0.5 protected service for the admin panel.
+All customer exports are **DEMO / UNOFFICIAL** documents, not bank-issued statements or proof of funds.
 
-**DEMO ONLY. Not a bank-issued statement, verification, financial credential or proof of funds.**
+## Backend file names (aligned with organization changes)
 
-## Where to edit
+| Path | Purpose |
+| --- | --- |
+| `src/main/java/com/ledgerdesk/pdf/RendererServer.java` | Protected HTTP server: `GET /health`, `POST /render` and self-test |
+| `src/main/java/com/ledgerdesk/pdf/BankStatementPdfGenerator.java` | Organization-provided template helper; correctly named for the public class |
+| `src/main/java/com/ledgerdesk/pdf/PdfTemplatePaths.java` | Central resource path constants |
+| `src/main/resources/templates/Nsave.pdf` | Organization-uploaded reference PDF, unchanged |
+| `src/main/resources/templates/ledgerdesk-demo-template.pdf` | Neutral, visibly unofficial layout used by the live `/render` workflow |
+| `pom.xml` | Maven dependencies; main class `com.ledgerdesk.pdf.RendererServer` |
+| `Dockerfile` | Java build, bundled licensed Inter fonts |
+| `../../.github/workflows/java-demo-pdf-renderer.yml` | GitHub Actions build + PDF self-test |
 
-- PDF layout template: `src/main/resources/templates/demo-statement-template.pdf` (real PDF in Git).
-- Dynamic text and coordinates: `src/main/java/com/ledgerdesk/pdf/RendererServer.java` in the `render()` method.
-- Maven dependency: `pom.xml`.
-- Font packaging and deployment: `Dockerfile`.
+The organization PDF resource is now loaded using the exact **Nsave.pdf** filename.
+Its helper class is in its own **BankStatementPdfGenerator.java** file, while the existing
+`RendererServer` retains the HTTP backend expected by Railway, Maven and the admin panel.
+The helper's illustrative output is conspicuously marked DEMO on every page.
+To avoid unintentionally treating an organization reference as an issuer-certified record,
+the normal download endpoint continues to use the neutral demo template.
 
-## Data path
+## Local build
 
-Authorized demo admin panel -> saved PostgreSQL customer -> demo export -> private POST /render ->
-PdfReader -> PdfStamper -> getOverContent(1) -> downloadable DEMO PDF.
+Run Docker from this directory:
 
-All identifiers must be masked; USD demo opening balances are administrator-provided and never verified.
-The PDF contains a visible DEMO / UNVERIFIED warning and zero transactions.
+```sh
+docker build -t ledgerdesk-renderer .
+docker run --rm -p 8080:8080 -e PORT=8080 -e RENDERER_TOKEN=secret ledgerdesk-renderer
+curl http://localhost:8080/health
+```
 
-## Fonts
+The Dockerfile installs Inter's static upright and italic variants and runs a synthetic
+PDF-generation self-test. Real customer data or API keys must not be committed.
+A separate GitHub connection in Railway is needed before source deployments can be enabled.
 
-Debian's `fonts-inter` package is installed during Docker build.
-All 18 Inter OpenType styles (upright and italic) are added to Maven resources before packaging.
-Font files are **not committed** to the public repository. The output embeds only used fonts.
+## Service contract
 
-## Railway
+- `GET /health`: readiness response
+- `POST /render`: Java-properties payload, `X-Renderer-Token` required; masked identifiers only;
+  USD, zero posted transactions, admin-entered demo balance
+- Private host: `http://java-demo-pdf.railway.internal:8080`
 
-On the existing `java-demo-pdf-renderer` service, connect the GitHub repo
-`Maxclemp5/ledgerly` with root directory `/java-demo-pdf-renderer`.
-The Dockerfile builds the renderer and performs a synthetic PDF self-test.
-Keep `RENDERER_TOKEN` and `PORT=8080` configured in Railway Variables.
-The admin panel calls `http://java-demo-pdf.railway.internal:8080/render` with a server-only token.
-Check service health at GET `/health`.
-
-Never commit customer records, PDFs containing personal data, unmasked identifiers or secrets.
-Official bank document issuance, signing, auditing and source-of-truth balances are not provided.
+The source includes safeguards for test-only output. For genuine bank document issuance
+you would need issuer-controlled verified data, signing, access controls and audit trails.

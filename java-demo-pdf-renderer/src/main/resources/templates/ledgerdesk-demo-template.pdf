@@ -1,0 +1,66 @@
+%PDF-1.4
+%ASCII-DEMO
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1943 >>
+stream
+0.12 0.19 0.29 rg BT /F2 16 Tf 1 0 0 1 43 738 Tm (LEDGER DESK / DEMO ACCOUNT ACTIVITY) Tj ET
+0.69 0.11 0.23 rg BT /F2 10 Tf 1 0 0 1 43 717 Tm (DEMONSTRATION ONLY - NOT BANK ISSUED) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 691 Tm (Period:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 653 Tm (Customer name:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 633 Tm (Street address:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 613 Tm (City / postal:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 593 Tm (Country:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 561 Tm (Bank label \(admin supplied\):) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 541 Tm (Bank address:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 521 Tm (Account \(masked\):) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 501 Tm (Routing \(masked\):) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 345 489 Tm (Opening balance:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 345 471 Tm (Closing balance:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 345 453 Tm (Total payments:) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 345 435 Tm (Total deposits:) Tj ET
+0.80 0.83 0.88 RG 0.7 w 43 416 m 569 416 l S
+0.12 0.19 0.29 rg BT /F2 10 Tf 1 0 0 1 43 397 Tm (TRANSACTION ACTIVITY) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 43 375 Tm (Date) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 130 375 Tm (Description) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 425 375 Tm (Amount) Tj ET
+0.35 0.42 0.52 rg BT /F1 9 Tf 1 0 0 1 515 375 Tm (Balance) Tj ET
+0.80 0.83 0.88 RG 0.7 w 43 363 m 569 363 l S
+0.35 0.42 0.52 rg BT /F1 10 Tf 1 0 0 1 43 335 Tm (No rows to display.) Tj ET
+0.91 0.80 0.82 rg BT /F2 37 Tf 1 0 0 1 105 265 Tm (DEMO / UNVERIFIED) Tj ET
+0.69 0.11 0.23 rg BT /F2 8 Tf 1 0 0 1 43 82 Tm (NOT AN OFFICIAL BANK STATEMENT OR PROOF OF FUNDS.) Tj ET
+0.35 0.42 0.52 rg BT /F1 8 Tf 1 0 0 1 43 65 Tm (Based on admin-entered demo records, not on any verified bank ledger.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Producer (LedgerDesk Demo PDF Template) /Title (Ledger Desk Unofficial Demo) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000021 00000 n 
+0000000070 00000 n 
+0000000127 00000 n 
+0000000263 00000 n 
+0000000360 00000 n 
+0000000462 00000 n 
+0000002456 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+2555
+%%EOF
