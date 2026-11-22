@@ -1,0 +1,6 @@
+target/
+src/main/resources/fonts/*.otf
+src/main/resources/fonts/*.ttf
+src/main/resources/fonts/INTER-LICENSE.txt
+.env
+*.log
