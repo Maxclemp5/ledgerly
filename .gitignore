@@ -2,3 +2,6 @@ target/
 .idea/
 *.class
 *.log
+
+cloud-statement-api/dashboard/node_modules/
+cloud-statement-api/dashboard/dist/
