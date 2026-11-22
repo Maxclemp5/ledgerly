@@ -64,11 +64,29 @@ export class StatementRepository {
     finally{client.release()}
   }
 }
-export function makePool(env=process.env){
-  return new pg.Pool({
-    host:env.PGHOST,port:Number(env.PGPORT||5432),
-    user:env.PGUSER,password:env.PGPASSWORD,database:env.PGDATABASE,
-    max:8,connectionTimeoutMillis:3000,idleTimeoutMillis:15000,
+
+export function buildPoolConfig(env=process.env){
+  const common={
+    max:8,
+    connectionTimeoutMillis:3000,
+    idleTimeoutMillis:15000,
     application_name:'ledgerdesk-statement-api'
-  });
+  };
+  if(env.DATABASE_URL){
+    return {...common,connectionString:env.DATABASE_URL};
+  }
+  if(!env.PGHOST||!env.PGUSER||!env.PGDATABASE||!env.PGPASSWORD){
+    throw new Error('DATABASE_URL or complete PGHOST/PGUSER/PGDATABASE/PGPASSWORD configuration is required');
+  }
+  return {
+    ...common,
+    host:env.PGHOST,
+    port:Number(env.PGPORT||5432),
+    user:env.PGUSER,
+    password:env.PGPASSWORD,
+    database:env.PGDATABASE
+  };
+}
+export function makePool(env=process.env){
+  return new pg.Pool(buildPoolConfig(env));
 }

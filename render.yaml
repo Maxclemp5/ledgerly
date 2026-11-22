@@ -1,0 +1,26 @@
+# Render Blueprint for the Ledger Desk API.
+# Confirm the issuer's data-residency requirements before first creation.
+# Render locks the service region after creation; keep the PostgreSQL database
+# in the same region and use its INTERNAL connection URL.
+services:
+  - type: web
+    name: ledgerdesk-statement-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: virginia
+    rootDir: cloud-statement-api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: ALLOWED_WEB_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_FILE
+        value: /etc/secrets/firebase-service-account.json

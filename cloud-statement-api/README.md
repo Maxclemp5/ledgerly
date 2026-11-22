@@ -1,66 +1,118 @@
-# Ledger Desk — Google Cloud statement-request API
+# Ledger Desk — Render deployment
 
-Production-migration scaffold: Node.js 22 on Cloud Run with Cloud SQL PostgreSQL and Firebase/Identity Platform authentication.
+This repository contains a Node.js 22 statement-request API. Render is the deployment target for the current hosting setup.
 
-**No PDF is issued from unverified records.** The issuer integration and signing worker must be provisioned by an authorized bank or institution before any document is designated bank-issued.
+**Important:** this API creates issuer-review requests. It does not issue bank statements from manually entered records. The download endpoint remains disabled until a real authorized issuer ledger, approval workflow, signing authority and secure document delivery are integrated.
 
-## Files
+## Render Blueprint
 
-- `src/main.mjs`: Cloud Run HTTP server with Firebase ID-token verification (revocation enabled).
-- `src/handler.mjs`: customer-scoped and organization-scoped manager routes.
-- `src/repository.mjs`: parameterized PostgreSQL queries and ownership checks.
-- `src/issuerLedger.mjs`: issuer connector contract, posted-entry and balance reconciliation.
-- `db/schema.sql`: dedicated verified accounts, identity mappings and statement request schema.
-- `test/*.test.mjs`: account isolation, manager permissions and ledger consistency tests.
-- `Dockerfile`: Cloud Run container.
+A root-level \`render.yaml\` defines one paid Docker web service:
 
-## Customer endpoints
+- Service: \`ledgerdesk-statement-api\`
+- Runtime: Docker, Node.js 22
+- Root directory: \`cloud-statement-api\`
+- Health check: \`/health\`
+- Initial auto-deploy: off, so secrets can be installed before the first deploy
+- Provisional region: Virginia. Confirm this with the institution's data-residency and contractual requirements before creating resources. Render locks a service's region after creation.
+- Compute: \`0.5c-512mb\` paid plan. Adjust to expected traffic and security review.
 
-Every non-health route requires a valid Firebase ID token in an Authorization: Bearer header.
+The Blueprint intentionally does **not** create a database automatically. This avoids provisioning a billable database or migrating/overwriting any existing customer data without an explicit decision.
 
-| Method | Route | Behavior |
-| --- | --- | --- |
-| GET | `/v1/me/accounts` | List only accounts linked to current authenticated UID |
-| GET | `/v1/me/statement-requests` | List own requests |
-| POST | `/v1/me/statement-requests` | Create issuer review request after account ownership check; returns 202 |
-| GET | `/v1/me/statement-requests/:uuid` | Look up one of the caller's requests |
-| GET | `/v1/me/statements/:uuid/download` | Disabled (409) until issuer-signed PDF delivery is integrated |
+## Before you create the Blueprint
 
-Example POST body: `{ "accountId": "acc_001", "from": "2026-10-01", "to": "2026-10-31" }`.
+1. Make the GitHub repository private before connecting production systems or storing organization-specific source/configuration. Never commit customer records, Firebase keys, bank credentials, private keys, exports or statement PDFs.
+2. Confirm that Render is approved by your institution for the relevant financial data, jurisdiction, retention, access controls, incident response and contractual/DPA requirements. A hosting provider's certifications do not automatically establish your organization's compliance.
+3. Create a Render PostgreSQL database in the **same approved region** as the web service. Use a paid plan appropriate for production, enable backups and review recovery/retention settings.
+4. Do not point this API at a Railway production database as a cross-platform shortcut. Plan a separately backed-up, encrypted, validated migration if existing data must move.
 
-Manager endpoint: POST `/v1/manager/customers/:customerId/statement-requests`.
-Managers need server-issued custom claims `statement_manager=true` AND `issuer_org_id`.
-The referenced verified account must belong to that same issuer organization.
-Neither customers nor managers can set account ownership, approval status, ledger balances or issuer status through this API.
+## Create the PostgreSQL database
 
-## Official ledger integration steps
+In the Render Dashboard:
 
-1. Contract with a real issuer/core-banking provider. Obtain its sandbox and production API access, allowed account scopes, OAuth2 client-credentials or mTLS specification, statement issuance authorization, schema, retry rules and webhooks.
-2. Keep issuer credentials in Google Secret Manager, not a browser, JavaScript bundle or GitHub. Run the connector under a dedicated Google Cloud service account using private network access where available.
-3. Import issuer-verified account mapping and customer ownership into `verified_accounts` and `customer_identity_links`. Validate that the issuer org and authenticated customer actually own each account. No user-controlled mapping API exists.
-4. Implement `connector.account`, `connector.postedEntries`, and `connector.boundaryBalances` against your issuer's real API. Fetch immutable posted transactions (not pending), opening/closing ledger balance checkpoints and currency, and stable transaction identifiers.
-5. Call `reconcileIssuerLedger` to validate closing = opening + credits - debits in integer minor units. Reject duplicate entries, dates outside the period, missing source checkpoints or mismatched institution/account.
-6. In a separate issuer-authorized job (Cloud Tasks or Pub/Sub worker), create a source snapshot checksum, signed audit event and customer-scoped issuance record. Official issuing must require authorized issuer signing credentials and workflow approval.
-7. For issuer-authorized PDFs, use a properly certified document signing workflow (e.g. PAdES/PKCS#7 PDF signature with an issuer-controlled certificate and key). Cloud KMS asymmetricSign is a cryptographic primitive, not by itself a complete PDF signature.
-8. Store final approved PDFs in a private Cloud Storage bucket with restricted access, retention and audit logs. Re-check customer ownership and request status before issuing a short-lived download.
+1. Choose **New → PostgreSQL**.
+2. Create a database in the same region as the API (the Blueprint currently selects Virginia).
+3. Choose a paid database plan and storage size after checking expected data volume, connection limits, backups and recovery objectives.
+4. Copy the **Internal Database URL** from the database's Connect page. Use the internal URL only for services in the same Render workspace and region. Do not use the public/external URL for the deployed API.
+5. Use a separate least-privilege application database role rather than the database owner/default administrative credentials.
 
-**Aggregation APIs:** Plaid or other data aggregators can supply permissioned transactions but that alone does not authorize an organization to issue an institution-branded statement. Prefer a bank's official statement API or an issuer-approved issuance service.
+Apply \`db/schema.sql\` using a trusted database-admin session. The schema creates the tables and indexes; it does not populate customer or account mappings. Populate those mappings only from an authorized issuer-controlled source of truth.
 
-## GCP deployment method
+The runtime role requires:
+- \`CONNECT\` on the database
+- \`USAGE\` on schema \`public\`
+- \`SELECT\` on \`customer_identity_links\` and \`verified_accounts\`
+- \`SELECT, INSERT\` on \`statement_requests\`
 
-1. Enable Cloud Run, Artifact Registry, Cloud SQL, Secret Manager and Identity Platform / Firebase services in your GCP project.
-2. Deploy PostgreSQL Cloud SQL, execute `db/schema.sql` with a migration account and grant the runtime DB identity read-only access to trusted mappings/accounts, plus SELECT and INSERT to statement requests.
-3. Configure Firebase sign-in. Backend uses Firebase Admin `verifyIdToken(token, true)`; custom manager roles must only be granted by trusted administrators.
-4. Build container from this folder: `gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/ledgerdesk/statement-api:VERSION .`
-5. Deploy Cloud Run, attach the Cloud SQL instance via `--add-cloudsql-instances`, set PGHOST as `/cloudsql/PROJECT:REGION:INSTANCE`, PGDATABASE, PGUSER, GOOGLE_CLOUD_PROJECT, ALLOWED_WEB_ORIGIN and PORT; inject PGPASSWORD from Secret Manager with `--set-secrets`.
-6. Put API Gateway / Cloud Armor rate limiting and monitoring in front of the service. For direct browser clients, Cloud Run must allow requests to reach your application; the application verifies each Firebase JWT. Do not leave alternate unauthenticated data routes.
-7. Assign separate IAM service accounts to the public API, ledger connector, issuance worker and KMS signer. Restrict issuer credentials and database permissions to the minimal components.
-8. Run `npm test` and a full authorized sandbox issuance test. Rotate old Railway credentials and retire Railway only after Google Cloud cutover and rollback readiness.
+Do not grant the runtime role permission to alter verified accounts, customer mappings, issuer verification or issuance status. Keep the admin connection URL out of the API service.
 
-## Configuration
+After creating the application role, configure \`DATABASE_URL\` with that role's credentials and the database's **internal hostname**. URL-encode special characters in the password. Render's internal Postgres connection does not require the external TLS query parameter; use the internal URL and keep both services in the same region.
 
-Required environment variables: `GOOGLE_CLOUD_PROJECT`, `ALLOWED_WEB_ORIGIN`, `PGHOST`, `PGPORT` (optional), `PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PORT` (optional).
+## Create the Render service
 
-Run tests locally with `node --test test/*.test.mjs` (Node 22). Runtime requires package installation `npm install`.
+1. Push/merge this configuration to the repository's \`main\` branch.
+2. Open the Render Dashboard and choose **New → Blueprint**.
+3. Connect the private GitHub repository \`Maxclemp5/ledgerly\` and select \`main\`.
+4. Review the Blueprint resources, selected region and paid compute plan before confirming.
+5. During initial Blueprint setup, provide these values when prompted:
+   - \`GOOGLE_CLOUD_PROJECT\`: Firebase project ID
+   - \`ALLOWED_WEB_ORIGIN\`: exact browser origin, e.g. \`http://localhost:5173\` for a local Vite frontend during development, or your deployed HTTPS frontend origin later
+   - \`DATABASE_URL\`: application-role PostgreSQL **internal** connection URL
+6. Do not deploy yet. Add the Firebase Admin credential secret file first.
 
-**Current status:** This is a request API with customer ownership enforcement and a ledger adapter contract, not an integration with any named bank. No official PDF or customer download is enabled. No Google Cloud resources have been provisioned.
+## Add Firebase Admin credentials as a Render Secret File
+
+1. In Firebase Console, select the same Firebase project used by your frontend.
+2. Create/use a dedicated service account with only the permissions needed for Firebase Admin ID-token verification and revocation checks. Do not use a project Owner key.
+3. Generate its JSON key only if your organization's security policy permits long-lived service-account keys. Prefer a supported short-lived workload identity approach where available.
+4. In the Render service, open **Environment → Secret Files → Add Secret File**.
+5. Filename: \`firebase-service-account.json\`
+6. Paste the service-account JSON into the secret-file editor and save it.
+7. The service reads it from \`/etc/secrets/firebase-service-account.json\` through \`FIREBASE_SERVICE_ACCOUNT_FILE\`.
+
+Never paste the JSON key into GitHub, \`render.yaml\`, chat, a Docker image, or application logs. Rotate/revoke it according to your organization's key-management policy. The Docker ignore file excludes common credential filenames.
+
+## Deploy and verify
+
+1. After the database URL and Firebase secret file are present, trigger **Manual Deploy → Deploy latest commit**.
+2. Confirm the Render build succeeds and the service becomes Live.
+3. Open \`https://YOUR-SERVICE.onrender.com/health\`; expect HTTP 200 and \`{"ok":true,"service":"ledgerdesk-statement-api"}\`.
+4. Request \`/v1/me/accounts\` without an Authorization header; expect HTTP 401 \`AUTH_REQUIRED\`.
+5. Test using a real Firebase test account and non-production test data first. Confirm cross-customer requests return 404 and manager requests without trusted server-issued claims return 403.
+6. Once the frontend is deployed, change \`ALLOWED_WEB_ORIGIN\` to its exact HTTPS origin. Do not use a wildcard.
+7. After validation, enable automatic deploys from the protected \`main\` branch and require CI checks to pass before deployment.
+
+## Runtime configuration
+
+The API supports both Render's \`DATABASE_URL\` and the existing split \`PGHOST\`, \`PGUSER\`, \`PGPASSWORD\`, \`PGDATABASE\` settings used by the earlier Cloud SQL configuration.
+
+Required:
+- \`GOOGLE_CLOUD_PROJECT\`
+- \`ALLOWED_WEB_ORIGIN\`
+- \`DATABASE_URL\` (Render) **or** all of \`PGHOST\`, \`PGUSER\`, \`PGDATABASE\`, \`PGPASSWORD\`
+
+Render secret file:
+- \`FIREBASE_SERVICE_ACCOUNT_FILE=/etc/secrets/firebase-service-account.json\`
+
+Render supplies \`PORT\`; the server binds to \`0.0.0.0\`.
+
+## API and security boundaries
+
+- Customer identity is derived from a verified Firebase ID token, not a customer ID sent by the browser.
+- Customer account and request queries are scoped to the authenticated UID through trusted identity mappings.
+- Manager request creation requires trusted server-issued \`statement_manager=true\` and matching \`issuer_org_id\` claims.
+- Account mappings and issuer verification are not writable through the public API.
+- The API cannot issue an official PDF. \`GET /v1/me/statements/:id/download\` remains gated until an authorized issuer system is integrated.
+- No real issuer connector, production account mapping, signing worker or statement storage is configured by this repository alone.
+
+For sensitive financial data, complete your institution's security, privacy, regulatory, retention, access-control, backup/restore and vendor-risk reviews before using real customer records. Render hosting alone does not certify the complete application or its operating processes.
+
+## Tests
+
+From \`cloud-statement-api\` with Node.js 22:
+
+\`\`\`sh
+npm install
+npm test
+\`\`\`
+
+The tests validate API ownership/manager boundaries and both Render \`DATABASE_URL\` and existing split PostgreSQL configuration. They use fake identities/data and do not prove a live bank integration.

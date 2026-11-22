@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - 'cloud-statement-api/**'
+      - 'render.yaml'
       - '.github/workflows/cloud-statement-api.yml'
   pull_request:
     paths:
       - 'cloud-statement-api/**'
+      - 'render.yaml'
       - '.github/workflows/cloud-statement-api.yml'
   workflow_dispatch:
 jobs:
@@ -26,7 +28,7 @@ jobs:
           node --check src/main.mjs
           node --check src/repository.mjs
           node --check src/issuerLedger.mjs
-      - name: Security and ledger tests
+      - name: API, ledger and database configuration tests
         run: npm test
       - name: Verify package dependencies
         run: npm install --no-audit --no-fund
