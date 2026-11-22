@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - 'cloud-statement-api/**'
+      - 'render.yaml'
       - '.github/workflows/cloud-statement-api.yml'
   pull_request:
     paths:
       - 'cloud-statement-api/**'
+      - 'render.yaml'
       - '.github/workflows/cloud-statement-api.yml'
   workflow_dispatch:
 jobs:
@@ -20,13 +22,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Syntax check
         run: |
           node --check src/handler.mjs
           node --check src/main.mjs
           node --check src/repository.mjs
           node --check src/issuerLedger.mjs
-      - name: Security and ledger tests
+      - name: API, ledger and database configuration tests
         run: npm test
-      - name: Verify package dependencies
-        run: npm install --no-audit --no-fund
+      - name: Validate Render Blueprint
+        run: ruby -e "require 'yaml'; YAML.load_file('../render.yaml')"
