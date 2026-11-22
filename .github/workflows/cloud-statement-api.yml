@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Syntax check
         run: |
           node --check src/handler.mjs
@@ -30,5 +32,5 @@ jobs:
           node --check src/issuerLedger.mjs
       - name: API, ledger and database configuration tests
         run: npm test
-      - name: Verify package dependencies
-        run: npm install --no-audit --no-fund
+      - name: Validate Render Blueprint
+        run: ruby -e "require 'yaml'; YAML.load_file('../render.yaml')"
