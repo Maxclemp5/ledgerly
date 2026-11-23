@@ -54,11 +54,11 @@ public final class StatementPdfRenderer {
         final int totalPages=Math.max(1,(rows+perPage-1)/perPage);
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         Document document=new Document(new Rectangle(PAGE_W,PAGE_H),0,0,0,0);
+        PdfWriter writer=PdfWriter.getInstance(document,out);
         document.addTitle("Account Statement "+s.path("currency").asText());
         document.addSubject("Account statement "+s.path("from").asText()+" to "+s.path("to").asText());
         document.addCreator("LedgerDesk OpenPDF statement issuance engine");
         document.addAuthor("LedgerDesk authorized issuer statement service");
-        PdfWriter writer=PdfWriter.getInstance(document,out);
         writer.setPdfVersion(PdfWriter.PDF_VERSION_1_7);
         document.open();
         try {
