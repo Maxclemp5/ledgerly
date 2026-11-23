@@ -29,6 +29,49 @@ export function canonicalNsaveCustomerReference(customerId){
   if(/^cus_[A-Za-z0-9_-]+$/.test(customerId))return 'nsave_'+customerId;
   return null;
 }
+// Verify customer/account association against a second authenticated nSave
+// source rather than assuming that internal cus_* and nsave_cus_* IDs share a suffix.
+export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,accountReference,statementCustomerReference}){
+  const isObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
+  const sources=[],seen=new Set();
+  function collect(x,depth=0){
+    if(!isObject(x)||seen.has(x)||depth>5||sources.length>120)return;
+    seen.add(x);sources.push(x);
+    for(const [key,val] of Object.entries(x)){
+      if(['data','customer','profile','banking','accounts','bank_accounts','bankAccounts','linked_accounts','linkedAccounts','items','results'].includes(key)){
+        if(Array.isArray(val))val.slice(0,100).forEach(a=>collect(a,depth+1));
+        else collect(val,depth+1);
+      }
+    }
+  }
+  collect(profilePayload);
+  // A customer detail lookup must be explicitly attributable to the requested
+  // customer, or include its uniquely bound account in a verified detail response.
+  const ids=new Set(sources.flatMap(x=>[x.id,x.customer_id,x.customerId]
+    .filter(v=>typeof v==='string'&&/^cus_[A-Za-z0-9_-]+$/.test(v))));
+  if(ids.size>0&&!ids.has(customerId))
+    throw new Error('nSave customer detail identity differs from the selected customer');
+  const bankAccounts=sources.filter(x=>
+    [x.account_reference,x.accountReference,x.nsave_account_reference]
+      .some(v=>v===accountReference));
+  if(bankAccounts.length!==1)
+    throw new Error('Selected account is not uniquely linked to the authenticated nSave customer profile');
+  const account=bankAccounts[0];
+  const explicitReferences=new Set(
+    [account.nsave_reference,account.nsaveReference]
+      .filter(v=>typeof v==='string'&&v.trim()));
+  // Customer-level reference is checked only when it is present in the trusted
+  // profile; never compute one from internal IDs or accept a browser override.
+  for(const item of sources){
+    if(item===account)continue;
+    if(item.nsave_reference&&typeof item.nsave_reference==='string'&&
+      (item.id===customerId||item.customer_id===customerId||item.customerId===customerId))
+      explicitReferences.add(item.nsave_reference);
+  }
+  if(explicitReferences.size>0&&!explicitReferences.has(statementCustomerReference))
+    throw new Error('nSave ledger customer reference conflicts with the authenticated customer profile');
+  return true;
+}
 function sendPdf(res,buffer,filename,origin=''){
   res.writeHead(200,{
     'content-type':'application/pdf',
@@ -182,16 +225,22 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           const customerId=input(data,'customerId',160);
           const accountReference=input(data,'accountReference',160);
           const {from,to}=validPeriod(data);
-          const customerReference=canonicalNsaveCustomerReference(customerId);
-          if(!customerReference||!/^nsave_[A-Za-z0-9_-]+$/.test(accountReference))
+          if(!/^(?:cus_|nsave_cus_)[A-Za-z0-9_-]+$/.test(customerId)||
+             !/^nsave_[A-Za-z0-9_-]+$/.test(accountReference))
             throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
           const organizations=await store.listManagerOrganizations(user.uid);
           if(!organizations.length)
             throw new HttpError(403,'NO_ORGANIZATION_ACCESS','No active manager organization grant');
-          const payload=await nsave.getStatement(accountReference,{start:from,end:to});
+          const [payload,customerProfile]=await Promise.all([
+            nsave.getStatement(accountReference,{start:from,end:to}),
+            nsave.getCustomer(customerId)
+          ]);
           let statement;
           try{
-            statement=normalizeNsaveStatement(payload,{accountReference,customerReference,from,to});
+            statement=normalizeNsaveStatement(payload,{accountReference,from,to});
+            verifyNsaveCustomerAccountBinding(customerProfile,{
+              customerId,accountReference,statementCustomerReference:statement.customerReference
+            });
             if(!statement.organizationReference)
               throw new Error('Missing nSave organization reference');
             if(process.env.NSAVE_ORGANIZATION_REFERENCE&&
