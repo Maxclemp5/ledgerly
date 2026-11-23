@@ -108,3 +108,34 @@ test('rejects customer identity discrepancies in authenticated detail',()=>{
   customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
  }),/identity differs/);
 });
+
+test('reports only safe yes/no diagnostics for genuine customer-reference conflicts',()=>{
+ const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_profile',
+  accounts:[{account_reference:'nsave_acct_test'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementCustomerReference:'nsave_cus_ledger'
+ }),e=>{
+  assert.equal(e.code,'NSAVE_CUSTOMER_REFERENCE_CONFLICT');
+  assert.deepEqual(e.diagnostics,{
+   selectedCustomerIdentityConfirmed:true,
+   selectedAccountLinkedToCustomer:true,
+   accountOwnerReferencePresent:false,
+   accountOwnerReferenceMatchesLedger:null,
+   profileOwnerReferencePresent:true,
+   profileOwnerReferenceMatchesLedger:false
+  });
+  const output=JSON.stringify(e.diagnostics);
+  assert.equal(output.includes('nsave_cus_profile'),false);
+  assert.equal(output.includes('nsave_cus_ledger'),false);
+  return true;
+ });
+});
+test('does not accept one matching owner reference if another authoritative source conflicts',()=>{
+ const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_profile',
+  accounts:[{account_reference:'nsave_acct_test',nsave_reference:'nsave_cus_ledger'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementCustomerReference:'nsave_cus_ledger'
+ }),/identity conflict/);
+});
