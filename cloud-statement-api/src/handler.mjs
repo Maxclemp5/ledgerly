@@ -374,7 +374,17 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
         return send(res,429,{error:{code:error.code,message:'nSave rate limit reached. Try again later.'}},origin);
       if(error?.code==='NSAVE_API_ERROR')
         return send(res,502,{error:{code:error.code,message:'nSave customer API returned an error ('+(error.upstreamStatus||'unknown')+'). Contact the nSave administrator.'}},origin);
-      logger.error('Statement API internal error',error?.name||'UnknownError');
+      if(error?.code==='42501'){
+        logger.error('Statement audit database access denied (42501)');
+        return send(res,503,{error:{code:'AUDIT_STORAGE_PERMISSION_DENIED',
+          message:'Statement issuance was blocked because the database runtime lacks permission to record the audit event.'}},origin);
+      }
+      if(error?.code==='42P01'){
+        logger.error('Statement audit table missing (42P01)');
+        return send(res,503,{error:{code:'AUDIT_STORAGE_NOT_CONFIGURED',
+          message:'Statement issuance was blocked because required audit storage is not configured.'}},origin);
+      }
+      logger.error('Statement API internal error',error?.name||'UnknownError',typeof error?.code==='string'?error.code:'');
       return send(res,503,{error:{code:'SERVICE_NOT_READY',message:'Issuer ledger service unavailable'}},origin);
     }
   };
