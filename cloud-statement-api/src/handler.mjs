@@ -129,7 +129,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
             throw new HttpError(400,'BAD_PAGINATION','Use limit 1–50 and a nonnegative offset');
           return send(res,200,{data:await nsave.listCustomers({limit,offset})},origin);
         }
-        const detail=/^\\/v1\\/manager\\/nsave\\/customers\\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
+        const detail=/^\/v1\/manager\/nsave\/customers\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
         if(req.method==='GET'&&detail)
           return send(res,200,{data:await nsave.getCustomer(detail[1])},origin);
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
