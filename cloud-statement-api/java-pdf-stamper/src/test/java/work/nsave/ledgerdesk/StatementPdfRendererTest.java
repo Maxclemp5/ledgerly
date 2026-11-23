@@ -19,11 +19,12 @@ class StatementPdfRendererTest {
           """);
         byte[] pdf=renderer.render(s);
         assertTrue(pdf.length>20_000);
-        try(PdfReader reader=new PdfReader(new ByteArrayInputStream(pdf))){
+        PdfReader reader=new PdfReader(new ByteArrayInputStream(pdf));
+        try {
             assertEquals(1,reader.getNumberOfPages());
             assertEquals(612f,reader.getPageSize(1).getWidth(),.1f);
             assertEquals(792f,reader.getPageSize(1).getHeight(),.1f);
-        }
+        } finally { reader.close(); }
     }
     @Test void rejectsUnreconciledBalances() throws Exception {
         StatementPdfRenderer renderer=new StatementPdfRenderer();
