@@ -108,3 +108,21 @@ GRANT EXECUTE ON FUNCTION public.manager_password_changed_since(text,timestamptz
 -- GRANT SELECT, INSERT ON statement_requests TO ledgerly_api_runtime;
 -- The issuer worker has separate, narrowly-scoped UPDATE/SELECT roles.
 -- Never grant ledgerly_api_runtime UPDATE on verified_accounts or ISSUED status.
+
+CREATE TABLE IF NOT EXISTS public.statement_delivery_audit (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_uid text NOT NULL,
+  organization_reference text NOT NULL,
+  customer_reference text NOT NULL,
+  account_reference text NOT NULL,
+  request_reference text NOT NULL,
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  action text NOT NULL CHECK (action IN ('statement.generated','statement.downloaded')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (period_start <= period_end)
+);
+CREATE INDEX IF NOT EXISTS statement_delivery_audit_org_created_idx
+  ON public.statement_delivery_audit(organization_reference,created_at DESC);
+CREATE INDEX IF NOT EXISTS statement_delivery_audit_account_period_idx
+  ON public.statement_delivery_audit(account_reference,period_start,period_end);
