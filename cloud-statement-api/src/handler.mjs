@@ -218,8 +218,8 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           return send(res,200,{data:{source:'NSAVE_STATEMENTS_API',
             customerId,accountReference:accountId,issuerOrgId:organizations[0].issuerOrgId,
             from,to,statement,statementSchema:safeShape(statement),
-            officialStatementReady:true,
-            note:'Statement data retrieved from the approved nSave statements endpoint.'}},origin);
+            officialStatementReady:false,
+            note:'Statement data retrieved. Use the validated generation action to issue a PDF.'}},origin);
         }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
           const criteria=await readJson(req);
