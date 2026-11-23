@@ -31,6 +31,17 @@ Required secret/environment settings on the **Render Free test service only**:
 
 Neither Neon signing credentials nor manager passwords are committed to GitHub.
 
+## Official statement PDF rendering
+
+The manager API keeps all nSave authentication, manager authorization, customer/account ownership verification, period validation, ledger reconciliation and audit logging in Node. Final PDF rendering is delegated to the separate Java 21 + Maven OpenPDF service under `java-pdf-stamper/`.
+
+Required environment variables on the **Free manager API service only**:
+
+- `PDF_STAMPER_URL` — the Java OpenPDF service HTTPS base URL.
+- `PDF_STAMPER_TOKEN` — shared bearer secret; never commit it to Git.
+
+The Java service requires the exact approved nSave background template at `java-pdf-stamper/src/main/resources/template/nsave-statement-template.pdf`. The original issuer template must be used; do not substitute a recreated layout. The Java service itself requires `PDF_STAMPER_TOKEN` with the same value.
+
 ## Test
 
 ```sh
