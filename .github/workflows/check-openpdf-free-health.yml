@@ -1,0 +1,25 @@
+name: Verify OpenPDF Free Service Health
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/check-openpdf-free-health.yml'
+jobs:
+  test-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public OpenPDF health without credentials
+        shell: bash
+        run: |
+          for attempt in $(seq 1 18); do
+            code=$(curl -sS --connect-timeout 8 --max-time 10 -o /tmp/render-health.txt -w '%{http_code}' \
+              https://ledgerdesk-openpdf-stamper-free.onrender.com/health || true)
+            echo "Attempt $attempt: HTTP $code"
+            if [ "$code" = "200" ] && grep -q '"status":"ok"' /tmp/render-health.txt; then
+              echo 'OpenPDF health verified'; exit 0
+            fi
+            sleep 6
+          done
+          echo 'OpenPDF health unavailable after multiple attempts'
+          exit 1
