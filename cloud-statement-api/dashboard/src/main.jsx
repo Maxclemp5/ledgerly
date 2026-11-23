@@ -184,7 +184,10 @@ function useManagerApi(client,onUnauthorized){
     if(response.status===401){onUnauthorized();throw new Error('Session expired. Please sign in again.');}
     if(!response.ok){
       const data=await response.json().catch(()=>({}));
-      throw new Error(data?.error?.message||'Request failed ('+response.status+')');
+      const issue=new Error(data?.error?.message||'Request failed ('+response.status+')');
+      if(data?.error?.code==='NSAVE_CUSTOMER_REFERENCE_CONFLICT'&&data?.error?.diagnostics)
+        issue.diagnostics=data.error.diagnostics;
+      throw issue;
     }
     if(options.responseType==='blob')return response.blob();
     const data=await response.json().catch(()=>({}));
