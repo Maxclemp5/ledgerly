@@ -22,7 +22,8 @@ public final class PdfStamperServer {
             throw new IllegalStateException("PDF_STAMPER_TOKEN must be configured with at least 32 characters");
         StatementPdfRenderer renderer = new StatementPdfRenderer();
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "10000"));
-        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 64);
+        String bindHost = System.getenv().getOrDefault("PDF_BIND_HOST", "0.0.0.0");
+        HttpServer server = HttpServer.create(new InetSocketAddress(bindHost, port), 64);
         server.setExecutor(Executors.newFixedThreadPool(Math.max(4, Runtime.getRuntime().availableProcessors())));
         server.createContext("/health", exchange -> {
             if (!"GET".equals(exchange.getRequestMethod())) {
