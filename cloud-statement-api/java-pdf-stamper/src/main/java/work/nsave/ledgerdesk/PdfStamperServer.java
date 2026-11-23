@@ -43,6 +43,7 @@ public final class PdfStamperServer {
         String auth = exchange.getRequestHeaders().getFirst("Authorization");
         String supplied = auth != null && auth.startsWith("Bearer ") ? auth.substring(7) : "";
         if (!MessageDigest.isEqual(expectedToken.getBytes(StandardCharsets.UTF_8), supplied.getBytes(StandardCharsets.UTF_8))) {
+            System.err.println("OpenPDF request rejected: AUTH_FAILURE");
             respond(exchange, 401, "application/json", "{\"error\":\"Unauthorized\"}".getBytes(StandardCharsets.UTF_8)); return;
         }
         try {
@@ -51,7 +52,9 @@ public final class PdfStamperServer {
                 respond(exchange, 413, "application/json", "{\"error\":\"Payload too large\"}".getBytes(StandardCharsets.UTF_8)); return;
             }
             JsonNode statement = JSON.readTree(body);
+            System.out.println("OpenPDF render request authenticated");
             byte[] pdf = renderer.render(statement);
+            System.out.println("OpenPDF render completed successfully");
             exchange.getResponseHeaders().set("Content-Type", "application/pdf");
             exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=nsave-account-statement.pdf");
             exchange.getResponseHeaders().set("Cache-Control", "no-store, private");
@@ -60,7 +63,15 @@ public final class PdfStamperServer {
             exchange.getResponseBody().write(pdf);
             exchange.close();
         } catch (IllegalArgumentException e) {
-            respond(exchange, 422, "application/json", JSON.writeValueAsBytes(Map.of("error", e.getMessage())));
+            // Never include customer values in server logs or HTTP errors.
+            String m=e.getMessage()==null?"":e.getMessage();
+            String code=m.contains("Customer address")||m.contains("Address does not fit")?"CUSTOMER_ADDRESS_OVERFLOW":
+                m.contains("Financial value")?"FINANCIAL_VALUE_OVERFLOW":
+                m.contains("statement field")||m.contains("Missing")?"RENDER_INPUT_INVALID":
+                m.contains("Field exceeds")||m.contains("Unbreakable")?"BANK_FIELD_OVERFLOW":
+                "RENDER_INPUT_INVALID";
+            System.err.println("OpenPDF render rejected: "+code);
+            respond(exchange, 422, "application/json", JSON.writeValueAsBytes(Map.of("code",code)));
         } catch (Exception e) {
             System.err.println("OpenPDF render failed: " + e.getClass().getSimpleName());
             respond(exchange, 500, "application/json", "{\"error\":\"PDF rendering failed\"}".getBytes(StandardCharsets.UTF_8));
