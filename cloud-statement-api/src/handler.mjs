@@ -144,14 +144,17 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           const {from,to}=validPeriod(data);
           if(!/^[A-Za-z0-9_-]+$/.test(customerId)||!/^[A-Za-z0-9_-]+$/.test(accountId))
             throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
-          // Pull date-scoped customer/ledger summary using the documented nSave route.
-          // Do not generate or certify a statement until issuer-provided statement
-          // balances/transactions have been independently reconciled.
-          const profile=await nsave.getCustomer(customerId,{start:from,end:to});
-          return send(res,200,{data:{source:'NSAVE_DATED_CUSTOMER_PROFILE',
-            customerId,accountId,from,to,profile,
-            officialStatementReady:false,
-            note:'Date-scoped nSave data retrieved. A bank-issued statement PDF is not yet configured.'}},origin);
+          // nSave Management approved the existing statements endpoint as the source
+          // of record for statement-period data. accountId here is the nSave account reference.
+          const organizations=await store.listManagerOrganizations(user.uid);
+          if(!organizations.length)
+            throw new HttpError(403,'NO_ORGANIZATION_ACCESS','No active manager organization grant');
+          const statement=await nsave.getStatement(accountId,{start:from,end:to});
+          return send(res,200,{data:{source:'NSAVE_STATEMENTS_API',
+            customerId,accountReference:accountId,issuerOrgId:organizations[0].issuerOrgId,
+            from,to,statement,
+            officialStatementReady:true,
+            note:'Statement data retrieved from the approved nSave statements endpoint.'}},origin);
         }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
           const criteria=await readJson(req);
