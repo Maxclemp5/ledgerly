@@ -100,7 +100,7 @@ test('rejects a contradictory explicit customer reference returned by authentica
   accounts:[{account_reference:'nsave_acct_test'}]}}};
  assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
   customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
- }),/conflicts/);
+ }),/identity conflict/);
 });
 test('rejects customer identity discrepancies in authenticated detail',()=>{
  const profile={data:{customer:{id:'cus_other',accounts:[{account_reference:'nsave_acct_test'}]}}};
