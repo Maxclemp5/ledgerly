@@ -67,7 +67,6 @@ public final class StatementPdfRenderer {
         writer.getInfo().put(PdfName.MODDATE,new PdfDate(issuedAt));
         document.addTitle("Account Statement "+s.path("currency").asText());
         document.addSubject("Account statement "+s.path("from").asText()+" to "+s.path("to").asText());
-        document.addAuthor("LedgerDesk authorized issuer statement service");
         writer.setPdfVersion(PdfWriter.PDF_VERSION_1_7);
         document.open();
         try {
@@ -108,7 +107,7 @@ public final class StatementPdfRenderer {
         pair(c,"Account Number",s.path("accountNumber").asText(),512.1f,200f);
         String route=s.path("routingNumber").asText("");
         label(c,"Routing Number",15.3f,492.3f);
-        if(!route.isBlank())text(c,regular,route,10.3f,158.1f,492.3f,MUTED,200f);
+        text(c,regular,route,10.3f,158.1f,492.3f,MUTED,200f);
 
         String[] lbl={"Opening Balance","Closing Balance","Total Payments","Total Deposits"};
         String[] keys={"opening","closing","payments","deposits"};
@@ -214,6 +213,8 @@ public final class StatementPdfRenderer {
         if(!s.path("transactions").isArray())throw new IllegalArgumentException("transactions must be an array");
         if(!"USD".equals(s.path("currency").asText()))
             throw new IllegalArgumentException("Approved statement layout currently supports USD only");
+        if(!s.path("routingNumber").asText("").matches("[0-9]{9}"))
+            throw new IllegalArgumentException("Verified nine-digit routing number is required");
         for(String k:new String[]{"opening","closing","payments","deposits"})
             if(!s.path(k).isIntegralNumber())throw new IllegalArgumentException("Invalid balance value: "+k);
         if(Math.addExact(s.path("opening").asLong(),s.path("deposits").asLong())
