@@ -45,6 +45,6 @@ text=actual[0].get_text()
 for historic in ("Suman Arif","152 galya Namir 3","317034465037","18/11/2026 - 21/11/2026"):
     if historic in text:raise SystemExit("Historic customer data leaked into native PDF")
 metadata=actual.metadata
-if "Quartz" in metadata.get("producer","") or "LedgerDesk" not in metadata.get("creator",""):
+if "Quartz" in metadata.get("producer","") or metadata.get("creator","").strip():
     raise SystemExit("New PDF provenance metadata is incorrect")
 print("Native OpenPDF geometry/provenance regression checks passed")
