@@ -65,7 +65,7 @@ export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={
       if((start===undefined)!==(end===undefined))
         throw new Error('Both statement start and end dates are required');
       if(start!==undefined){
-        const validDate=(d)=>typeof d==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(d)&&
+        const validDate=(d)=>typeof d==='string'&&/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&
           Number.isFinite(Date.parse(d+'T00:00:00Z'))&&new Date(Date.parse(d+'T00:00:00Z')).toISOString().slice(0,10)===d;
         if(!validDate(start)||!validDate(end)||start>end)
           throw new Error('Invalid nSave customer reporting period');
