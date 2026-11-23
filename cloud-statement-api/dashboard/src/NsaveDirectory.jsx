@@ -43,16 +43,17 @@ function Profile({profile,onBack,api}){
    <Field label="Created">{value(profile.created_at||profile.createdAt)}</Field>
    <Field label="KYC">{value(profile.kyc_status||profile.kycStatus)}</Field>
    <Field label="Address">{value(nsaveAddressText(address))}</Field>
+   <Field label="Bank address">{value(nsaveAddressText(profile.bank_address||accounts[0]?.bank_address))}</Field>
   </div>
   <h3>Linked nSave bank accounts</h3>
   {!accounts.length?<p>Linked bank-account details are not included in the nSave profile response. The customer record loaded, but no account list was supplied by this endpoint.</p>:
    <div className="old-overflow"><table><thead><tr><th>Select</th><th>Account</th><th>Bank</th><th>Currency</th><th>Status</th></tr></thead>
     <tbody>{accounts.map((a,i)=>{
-     const aid=String(a.id||a.account_id||a.accountId||'');
+     const aid=String(a.id||a.account_id||a.accountId||a.account_reference||a.accountReference||'');
      return <tr key={aid||i}>
       <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||a.accountNumber||a.iban||aid)}
        checked={selected===aid&&!!aid} disabled={!aid} onChange={()=>{setSelected(aid);setError('');setResult('')}}/></td>
-      <td>{mask(a.account_number||a.accountNumber||a.masked_number||a.iban||aid)}<small>{value(a.id||a.account_id)}</small></td>
+      <td>{mask(a.account_number||a.accountNumber||a.masked_number||a.iban||aid)}<small>{value(a.account_reference||a.accountReference||a.id||a.account_id)}</small></td>
       <td>{value(a.bank_name||a.bankName||a.bank?.name)}</td><td>{value(a.currency||a.currency_code)}</td><td>{value(a.status)}</td>
      </tr>;
     })}</tbody></table></div>}
@@ -103,7 +104,7 @@ export default function NsaveDirectory({api}){
   setBusyProfile(true);
   try{
    const data=await api('/v1/manager/nsave/customers/'+encodeURIComponent(id));
-   const profile=nsaveCustomer(data);
+   const profile=nsaveCustomer(data,item);
    if(!customerId(profile))throw new Error('nSave returned an incomplete customer profile.');
    setSelected(profile);
   }catch(e){setError(e.message||'Customer profile could not be loaded')}finally{setBusyProfile(false)}
