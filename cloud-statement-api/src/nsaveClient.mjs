@@ -59,10 +59,20 @@ export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={
         throw new Error('Invalid nSave customer pagination');
       return this.call('customers',{query:{limit,offset}});
     },
-    getCustomer(id){
-      if(typeof id!=='string'||!id.trim()||id.length>160||/[/?#]/.test(id))
+    getCustomer(id,{start,end}={}){
+      if(typeof id!=='string'||!id.trim()||id.length>160||!/^([A-Za-z0-9_-]+)$/.test(id.trim()))
         throw new Error('Invalid nSave customer identifier');
-      return this.call('customers/'+encodeURIComponent(id.trim()));
+      if((start===undefined)!==(end===undefined))
+        throw new Error('Both statement start and end dates are required');
+      if(start!==undefined){
+        const validDate=(d)=>typeof d==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(d)&&
+          Number.isFinite(Date.parse(d+'T00:00:00Z'))&&new Date(Date.parse(d+'T00:00:00Z')).toISOString().slice(0,10)===d;
+        if(!validDate(start)||!validDate(end)||start>end)
+          throw new Error('Invalid nSave customer reporting period');
+      }
+      return this.call('customers/'+encodeURIComponent(id.trim()),{
+        query:start===undefined?{}:{start,end}
+      });
     },
     searchCustomer(criteria){
       if(!criteria||typeof criteria!=='object'||Array.isArray(criteria))throw new Error('Search criteria required');
