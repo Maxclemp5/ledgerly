@@ -68,7 +68,7 @@ function Profile({profile,onBack,api}){
   <p>Only reveal full account numbers when necessary for authorized branch verification. They are hidden again when you leave this profile.</p>
   <div className="nsave-statement">
    <h3><FileText size={17}/> Statement generation</h3>
-   <p>Select an account and reporting period to check whether the issuer has provided the verified ledger and statement source.</p>
+   <p>Select an account and reporting period. Brand-new accounts are eligible for statements even when they have no transactions. A zero-activity statement must still use verified balances.</p>
    <form className="old-form" onSubmit={prepare}>
     <div className="nsave-dates">
      <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)} required/></label>
@@ -78,7 +78,7 @@ function Profile({profile,onBack,api}){
    </form>
    {error&&<div className="old-alert error" role="alert">{error}</div>}
    {result&&<div className="old-alert ok" role="status">{result}</div>}
-   <p><ShieldCheck size={13}/> Official PDF statements require issuer-verified transactions and opening/closing balances. Customer profiles alone are not sufficient.</p>
+   <p><ShieldCheck size={13}/> No transactions during a period is valid. Statement PDF delivery requires issuer-verified opening and closing balances and an authorized statement source.</p>
   </div>
  </div>;
 }
