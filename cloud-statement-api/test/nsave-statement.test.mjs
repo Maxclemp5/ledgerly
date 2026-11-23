@@ -69,14 +69,14 @@ test('profile account_reference is authoritative when nsave customer references 
  assert.equal(verifyNsaveCustomerAccountBinding(profile,{
   customerId:'cus_test',accountReference:'nsave_acct_test',
   statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
- }),true);
+ }).accountReference,'nsave_acct_test');
 });
 test('supports a flat nSave customer profile account_reference',()=>{
  const profile={data:{id:'cus_test',account_reference:'nsave_acct_test',account_id:'acct_test'}};
  assert.equal(verifyNsaveCustomerAccountBinding(profile,{
   customerId:'cus_test',accountReference:'nsave_acct_test',
   statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
- }),true);
+ }).accountReference,'nsave_acct_test');
 });
 test('rejects an account reference absent from selected customer profile',()=>{
  const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_other'}]}}};
@@ -104,7 +104,7 @@ test('accepts a missing optional account_id from either source',()=>{
  assert.equal(verifyNsaveCustomerAccountBinding(profile,{
   customerId:'cus_test',accountReference:'nsave_acct_test',
   statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
- }),true);
+ }).accountReference,'nsave_acct_test');
 });
 test('rejects contradictory customer identity in profile response',()=>{
  const profile={data:{customer:{id:'cus_other',accounts:[{account_reference:'nsave_acct_test'}]}}};
