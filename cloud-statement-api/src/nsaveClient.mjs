@@ -17,7 +17,7 @@ function takeSlot(key,now=Date.now()){
   b.count++;
 }
 function safePath(path){
-  if(path!=='customers'&&path!=='customers/search'&&!/^customers\/[A-Za-z0-9_%.-]+$/.test(path))throw new Error('Unsupported nSave API route');
+  if(path!=='customers'&&path!=='customers/search'&&!/^customers\/[A-Za-z0-9_%.-]+$/.test(path)&&!/^statements\/[A-Za-z0-9_-]+$/.test(path))throw new Error('Unsupported nSave API route');
   return API_BASE+'/'+path;
 }
 export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={}){
@@ -72,6 +72,18 @@ export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={
       }
       return this.call('customers/'+encodeURIComponent(id.trim()),{
         query:start===undefined?{}:{start,end}
+      });
+    },
+    getStatement(accountReference,{start,end}={}){
+      if(typeof accountReference!=='string'||!accountReference.trim()||
+        accountReference.length>160||!/^([A-Za-z0-9_-]+)$/.test(accountReference.trim()))
+        throw new Error('Invalid nSave account reference');
+      const validDate=(d)=>typeof d==='string'&&/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&
+        Number.isFinite(Date.parse(d+'T00:00:00Z'))&&new Date(Date.parse(d+'T00:00:00Z')).toISOString().slice(0,10)===d;
+      if(!validDate(start)||!validDate(end)||start>end)
+        throw new Error('Invalid nSave statement reporting period');
+      return this.call('statements/'+encodeURIComponent(accountReference),{
+        query:{start,end}
       });
     },
     searchCustomer(criteria){
