@@ -31,12 +31,15 @@ export function canonicalNsaveCustomerReference(customerId){
 }
 // Verify customer/account association against a second authenticated nSave
 // source rather than assuming that internal cus_* and nsave_cus_* IDs share a suffix.
-export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,accountReference,statementCustomerReference}){
-  const isObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
-  const sources=[],seen=new Set();
+// The nSave manager API uses the profile's account_reference as the
+// authoritative binding. Different customer reference namespaces are not
+// compared; account_id is compared if both sources supply it.
+export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,accountReference,statementAccountReference,statementAccountId}){
+  const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+  const objects=[],seen=new Set();
   function collect(x,depth=0){
-    if(!isObject(x)||seen.has(x)||depth>5||sources.length>120)return;
-    seen.add(x);sources.push(x);
+    if(!isObject(x)||seen.has(x)||depth>6||objects.length>150)return;
+    seen.add(x);objects.push(x);
     for(const [key,val] of Object.entries(x)){
       if(['data','customer','profile','banking','accounts','bank_accounts','bankAccounts','linked_accounts','linkedAccounts','items','results'].includes(key)){
         if(Array.isArray(val))val.slice(0,100).forEach(a=>collect(a,depth+1));
@@ -45,43 +48,24 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
     }
   }
   collect(profilePayload);
-  // A customer detail lookup must be explicitly attributable to the requested
-  // customer, or include its uniquely bound account in a verified detail response.
-  const ids=new Set(sources.flatMap(x=>[x.id,x.customer_id,x.customerId]
+  const customerIds=new Set(objects.flatMap(x=>[x.id,x.customer_id,x.customerId]
     .filter(v=>typeof v==='string'&&/^cus_[A-Za-z0-9_-]+$/.test(v))));
-  if(ids.size>0&&!ids.has(customerId))
+  if(customerIds.size>0&&(customerIds.size!==1||!customerIds.has(customerId)))
     throw new Error('nSave customer detail identity differs from the selected customer');
-  const bankAccounts=sources.filter(x=>
-    [x.account_reference,x.accountReference,x.nsave_account_reference]
-      .some(v=>v===accountReference));
-  if(bankAccounts.length!==1)
-    throw new Error('Selected account is not uniquely linked to the authenticated nSave customer profile');
-  const account=bankAccounts[0];
-  const accountReferences=[account.nsave_reference,account.nsaveReference]
-    .filter(v=>typeof v==='string'&&v.trim());
-  const customerReferences=[];
-  // Read customer-level identity only from an explicitly identified customer
-  // object. These are independent authoritative claims, not interchangeable IDs.
-  for(const item of sources){
-    if(item===account)continue;
-    if(item.nsave_reference&&typeof item.nsave_reference==='string'&&
-      (item.id===customerId||item.customer_id===customerId||item.customerId===customerId))
-      customerReferences.push(item.nsave_reference);
-  }
-  const allRefs=[...accountReferences,...customerReferences];
-  if(allRefs.some(x=>x!==statementCustomerReference)){
-    const err=new Error('Customer identity conflict between nSave customer and statement APIs. Statement issuance is blocked pending nSave source correction.');
-    err.code='NSAVE_CUSTOMER_REFERENCE_CONFLICT';
-    err.diagnostics={
-      selectedCustomerIdentityConfirmed:ids.size>0&&ids.has(customerId),
-      selectedAccountLinkedToCustomer:bankAccounts.length===1,
-      accountOwnerReferencePresent:accountReferences.length>0,
-      accountOwnerReferenceMatchesLedger:accountReferences.length===0?null:accountReferences.every(x=>x===statementCustomerReference),
-      profileOwnerReferencePresent:customerReferences.length>0,
-      profileOwnerReferenceMatchesLedger:customerReferences.length===0?null:customerReferences.every(x=>x===statementCustomerReference)
-    };
-    throw err;
-  }
+  const entries=objects.filter(x=>typeof (x.account_reference??x.accountReference)==='string');
+  const matched=entries.filter(x=>(x.account_reference??x.accountReference)===accountReference);
+  if(matched.length!==1)
+    throw new Error('Selected account reference is not uniquely linked to the authenticated nSave customer profile');
+  if(accountReference!==statementAccountReference)
+    throw new Error('Statement account reference does not match the authenticated customer profile');
+  // Prefer the selected account's own ID, not the customer's id. Both APIs
+  // must agree if each explicitly exposes an account_id.
+  const account=matched[0];
+  const profileAccountId=account.account_id??account.accountId??null;
+  if(profileAccountId!==null&&profileAccountId!==''&&
+      statementAccountId!==null&&statementAccountId!==undefined&&statementAccountId!==''
+      &&profileAccountId!==statementAccountId)
+    throw new Error('Statement account ID does not match the authenticated customer profile');
   return true;
 }
 function sendPdf(res,buffer,filename,origin=''){
@@ -243,15 +227,21 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           const organizations=await store.listManagerOrganizations(user.uid);
           if(!organizations.length)
             throw new HttpError(403,'NO_ORGANIZATION_ACCESS','No active manager organization grant');
-          const [payload,customerProfile]=await Promise.all([
-            nsave.getStatement(accountReference,{start:from,end:to}),
-            nsave.getCustomer(customerId)
-          ]);
+          // Fetch the customer profile first; only use its verified account
+          // reference to request an nSave statement for the selected period.
+          const customerProfile=await nsave.getCustomer(customerId);
           let statement;
           try{
+            // Profile ownership is checked before the statement API is called.
+            verifyNsaveCustomerAccountBinding(customerProfile,{
+              customerId,accountReference,statementAccountReference:accountReference
+            });
+            const payload=await nsave.getStatement(accountReference,{start:from,end:to});
             statement=normalizeNsaveStatement(payload,{accountReference,from,to});
             verifyNsaveCustomerAccountBinding(customerProfile,{
-              customerId,accountReference,statementCustomerReference:statement.customerReference
+              customerId,accountReference,
+              statementAccountReference:statement.accountReference,
+              statementAccountId:statement.accountId
             });
             if(!statement.organizationReference)
               throw new Error('Missing nSave organization reference');
