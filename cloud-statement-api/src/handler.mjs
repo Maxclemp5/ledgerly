@@ -1,4 +1,4 @@
-import {normalizeNsaveStatement,renderNsaveStatement} from './nsaveStatement.mjs';
+import {normalizeNsaveStatement} from './nsaveStatement.mjs';
 import {URL} from 'node:url';
 
 export class HttpError extends Error {
@@ -67,6 +67,37 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
       &&profileAccountId!==statementAccountId)
     throw new Error('Statement account ID does not match the authenticated customer profile');
   return true;
+}
+async function renderWithOpenPdf(statement){
+  const base=process.env.PDF_STAMPER_URL;
+  const token=process.env.PDF_STAMPER_TOKEN;
+  if(!base||!token)throw new HttpError(503,'PDF_STAMPER_NOT_CONFIGURED','The approved OpenPDF rendering service is not configured.');
+  let response;
+  try{
+    response=await fetch(new URL('/render',base),{
+      method:'POST',
+      headers:{'authorization':'Bearer '+token,'content-type':'application/json','accept':'application/pdf'},
+      body:JSON.stringify(statement),
+      signal:AbortSignal.timeout(90000)
+    });
+  }catch{
+    throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE','The OpenPDF rendering service is temporarily unavailable.');
+  }
+  if(!response.ok){
+    if(response.status===422){
+      const issue=await response.json().catch(()=>({}));
+      throw new HttpError(422,'PDF_STAMPER_VALIDATION_FAILED',
+        typeof issue.error==='string'?issue.error:'The statement does not fit the approved PDF template.');
+    }
+    throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE','The OpenPDF rendering service could not complete the statement.');
+  }
+  const type=response.headers.get('content-type')||'';
+  if(!type.toLowerCase().includes('application/pdf'))
+    throw new HttpError(502,'PDF_STAMPER_INVALID_RESPONSE','The OpenPDF service returned an invalid document response.');
+  const bytes=Buffer.from(await response.arrayBuffer());
+  if(bytes.length<1000||bytes.length>15_000_000||bytes.subarray(0,5).toString('ascii')!=='%PDF-')
+    throw new HttpError(502,'PDF_STAMPER_INVALID_PDF','The OpenPDF service returned an invalid PDF.');
+  return bytes;
 }
 function sendPdf(res,buffer,filename,origin=''){
   res.writeHead(200,{
@@ -254,7 +285,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
             if(error?.code==='NSAVE_CUSTOMER_REFERENCE_CONFLICT')issue.diagnostics=error.diagnostics;
             throw issue;
           }
-          const pdf=await renderNsaveStatement(statement);
+          const pdf=await renderWithOpenPdf(statement);
           const audit={actorUid:user.uid,organizationReference:statement.organizationReference,
             customerReference:statement.customerReference,accountReference:statement.accountReference,
             requestReference:statement.requestReference,from,to};
