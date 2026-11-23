@@ -2,14 +2,14 @@ FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /build
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates python3 python3-pip \
- && python3 -m pip install --break-system-packages --no-cache-dir PyMuPDF==1.26.6 \
+ && python3 -m pip install --break-system-packages --no-cache-dir PyMuPDF==1.26.6 Pillow==11.3.0 fonttools==4.60.1 \
  && rm -rf /var/lib/apt/lists/*
 COPY pom.xml .
 COPY src ./src
 COPY scripts ./scripts
-RUN python3 scripts/prepare_template.py \
- && mkdir -p src/main/resources/fonts \
+RUN mkdir -p src/main/resources/fonts \
  && curl -fL "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf" -o src/main/resources/fonts/Inter-Regular.ttf \
+ && python3 scripts/extract_design_assets.py \
  && mvn -B clean package
 
 FROM eclipse-temurin:21-jre
