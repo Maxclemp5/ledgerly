@@ -49,7 +49,7 @@ export function normalizeNsaveStatement(payload,{accountReference,customerRefere
   throw new Error('nSave statement balances do not reconcile: opening + deposits - payments must equal closing');
  if(!Array.isArray(row.transactions))throw new Error('nSave transactions must be an array');
  const transactions=row.transactions.map((x,i)=>transactionRow(x,i,currency));
- if(transactions.length===0&&deposits!==0&&payments!==0)
+ if(transactions.length===0&&(deposits!==0||payments!==0))
   throw new Error('nSave returned no transactions but non-zero period totals');
  if(transactions.length>0){
   const credits=transactions.reduce((sum,x)=>sum+Math.max(0,x.amount),0);
@@ -68,7 +68,7 @@ export function normalizeNsaveStatement(payload,{accountReference,customerRefere
   bankName:text(row.bank_name,'bank_name',120),
   bankAddress:text(row.bank_address,'bank_address',300),
   accountNumber:text(row.account_number,'account_number',64),
-  routingNumber:typeof row.routing_number==='string'?row.routing_number:'',
+  routingNumber:typeof row.routing_number==='string'?row.routing_number.trim():'',
   currency,from:root.start,to:root.end,opening,deposits,payments,closing,transactions
  });
 }
