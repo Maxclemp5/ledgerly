@@ -1,4 +1,4 @@
-import {canonicalNsaveCustomerReference} from '../src/handler.mjs';
+import {canonicalNsaveCustomerReference,verifyNsaveCustomerAccountBinding} from '../src/handler.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeNsaveStatement,renderNsaveStatement} from '../src/nsaveStatement.mjs';
@@ -78,4 +78,33 @@ test('customer directory ID canonically maps to the ledger nsave_reference',()=>
   'nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce');
  assert.equal(canonicalNsaveCustomerReference('cus_other'), 'nsave_cus_other');
  for(const unsafe of ['acct_123','cus_../../other','cus_/x',''])assert.equal(canonicalNsaveCustomerReference(unsafe),null);
+});
+
+test('authenticates account association where ledger customer reference differs from internal ID',()=>{
+ const profile={data:{customer:{id:'cus_test',accounts:[{
+  id:'acct_test',account_reference:'nsave_acct_test'
+ }]}}};
+ assert.equal(verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementCustomerReference:'nsave_cus_unrelated_generated_reference'
+ }),true);
+});
+test('rejects a statement if its account does not belong to the authenticated customer detail',()=>{
+ const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_other'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_test'
+ }),/not uniquely linked/);
+});
+test('rejects a contradictory explicit customer reference returned by authenticated nSave detail',()=>{
+ const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_true',
+  accounts:[{account_reference:'nsave_acct_test'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
+ }),/conflicts/);
+});
+test('rejects customer identity discrepancies in authenticated detail',()=>{
+ const profile={data:{customer:{id:'cus_other',accounts:[{account_reference:'nsave_acct_test'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
+ }),/identity differs/);
 });
