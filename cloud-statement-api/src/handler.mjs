@@ -53,7 +53,7 @@ async function principal(req,verify) {
     return p;
   }catch {throw new HttpError(401,'AUTH_REQUIRED','Session invalid or revoked')}
 }
-export function createHandler({verify,store,allowedOrigin='',logger=console,enableCustomerModule=false}) {
+export function createHandler({verify,store,allowedOrigin='',logger=console,enableCustomerModule=false,nsave=null}) {
   if(typeof verify!=='function'||!store)throw new TypeError('Verification and storage required');
   return async (req,res)=>{
     const origin=allowedOrigin&&req.headers.origin===allowedOrigin?allowedOrigin:'';
@@ -117,6 +117,26 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       const managerPath=url.pathname.startsWith('/v1/manager/');
       if(managerPath&&!await store.isManager(user.uid)){
         throw new HttpError(403,'FORBIDDEN','Organization manager access required');
+      }
+      // nSave live customer data is available only to authenticated organization managers.
+      if(url.pathname.startsWith('/v1/manager/nsave/')) {
+        if(!nsave||!nsave.configured())
+          throw new HttpError(503,'NSAVE_NOT_CONFIGURED','nSave API credentials are not configured on this service');
+        if(req.method==='GET'&&url.pathname==='/v1/manager/nsave/customers'){
+          const limit=Number(url.searchParams.get('limit')||50);
+          const offset=Number(url.searchParams.get('offset')||0);
+          if(!Number.isInteger(limit)||limit<1||limit>50||!Number.isInteger(offset)||offset<0)
+            throw new HttpError(400,'BAD_PAGINATION','Use limit 1–50 and a nonnegative offset');
+          return send(res,200,{data:await nsave.listCustomers({limit,offset})},origin);
+        }
+        const detail=/^\\/v1\\/manager\\/nsave\\/customers\\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
+        if(req.method==='GET'&&detail)
+          return send(res,200,{data:await nsave.getCustomer(detail[1])},origin);
+        if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
+          const criteria=await readJson(req);
+          return send(res,200,{data:await nsave.searchCustomer(criteria)},origin);
+        }
+        throw new HttpError(404,'NOT_FOUND','nSave customer route not found');
       }
       if(req.method==='GET'&&url.pathname==='/v1/manager/summary')
         return send(res,200,{data:await store.getManagerSummary(user.uid)},origin);
@@ -191,7 +211,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       if(res.headersSent)return;
       if(error?.name==='SourceNotVerified')
         return send(res,409,{error:{code:'NOT_VERIFIED',message:'Account is not issuer-verified'}},origin);
-      if(error instanceof HttpError)
+      if(error?.code==='NSAVE_AUTH_FAILED')return send(res,502,{error:{code:error.code,message:'nSave rejected the configured credentials. Ask the nSave administrator to issue/confirm an active key.'}},origin);\n      if(error?.code==='UPSTREAM_RATE_LIMIT')return send(res,429,{error:{code:error.code,message:'nSave API rate limit reached. Please retry later.'}},origin);\n      if(error?.code==='NSAVE_API_ERROR')return send(res,502,{error:{code:error.code,message:'nSave API request failed.'}},origin);\n      if(error instanceof HttpError)
         return send(res,error.status,{error:{code:error.code,message:error.message}},origin);
       logger.error('Statement API internal error',error?.name||'UnknownError');
       return send(res,503,{error:{code:'SERVICE_NOT_READY',message:'Issuer ledger service unavailable'}},origin);
