@@ -23,10 +23,8 @@ function Profile({profile,onBack,api}){
  async function generatePdf(){
   setError('');setGenerating(true);
   try{
-   const customerReference=profile.nsave_reference||profile.nsaveReference||profile.reference;
-   if(!customerReference)throw new Error('The selected customer has no nSave customer reference.');
    const pdf=await api('/v1/manager/nsave/statements/generate',{method:'POST',responseType:'blob',body:{
-    customerId:id,customerReference,accountReference:selected,from,to
+    customerId:id,accountReference:selected,from,to
    }});
    const url=URL.createObjectURL(pdf);
    const a=document.createElement('a');a.href=url;a.download='nsave-statement-'+from+'-to-'+to+'.pdf';
