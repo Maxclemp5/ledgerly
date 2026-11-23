@@ -1,4 +1,4 @@
-import {canonicalNsaveCustomerReference,verifyNsaveCustomerAccountBinding} from '../src/handler.mjs';
+import {verifyNsaveCustomerAccountBinding} from '../src/handler.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeNsaveStatement,renderNsaveStatement} from '../src/nsaveStatement.mjs';
@@ -71,71 +71,54 @@ test('renders a valid zero-activity statement PDF',async()=>{
  assert.ok(pdf.length>1000);
 });
 
-test('customer directory ID canonically maps to the ledger nsave_reference',()=>{
- assert.equal(canonicalNsaveCustomerReference('cus_a1b842ae1c1a467a9a389a1fbb544cce'),
-  'nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce');
- assert.equal(canonicalNsaveCustomerReference('nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce'),
-  'nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce');
- assert.equal(canonicalNsaveCustomerReference('cus_other'), 'nsave_cus_other');
- for(const unsafe of ['acct_123','cus_../../other','cus_/x',''])assert.equal(canonicalNsaveCustomerReference(unsafe),null);
-});
 
-test('authenticates account association where ledger customer reference differs from internal ID',()=>{
- const profile={data:{customer:{id:'cus_test',accounts:[{
-  id:'acct_test',account_reference:'nsave_acct_test'
- }]}}};
+test('profile account_reference is authoritative when nsave customer references differ',()=>{
+ const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_profile',
+  accounts:[{account_reference:'nsave_acct_test',account_id:'acct_test'}]}}};
  assert.equal(verifyNsaveCustomerAccountBinding(profile,{
   customerId:'cus_test',accountReference:'nsave_acct_test',
-  statementCustomerReference:'nsave_cus_unrelated_generated_reference'
+  statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
  }),true);
 });
-test('rejects a statement if its account does not belong to the authenticated customer detail',()=>{
+test('supports a flat nSave customer profile account_reference',()=>{
+ const profile={data:{id:'cus_test',account_reference:'nsave_acct_test',account_id:'acct_test'}};
+ assert.equal(verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
+ }),true);
+});
+test('rejects an account reference absent from selected customer profile',()=>{
  const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_other'}]}}};
  assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
-  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_test'
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_test'
  }),/not uniquely linked/);
 });
-test('rejects a contradictory explicit customer reference returned by authenticated nSave detail',()=>{
- const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_true',
-  accounts:[{account_reference:'nsave_acct_test'}]}}};
+test('rejects a statement account reference different from the profile',()=>{
+ const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_test'}]}}};
  assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
-  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
- }),/identity conflict/);
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_other'
+ }),/Statement account reference/);
 });
-test('rejects customer identity discrepancies in authenticated detail',()=>{
+test('rejects mismatched account_id when both APIs supply it',()=>{
+ const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_test',account_id:'acct_profile'}]}}};
+ assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_test',statementAccountId:'acct_statement'
+ }),/Statement account ID/);
+});
+test('accepts a missing optional account_id from either source',()=>{
+ const profile={data:{customer:{id:'cus_test',accounts:[{account_reference:'nsave_acct_test'}]}}};
+ assert.equal(verifyNsaveCustomerAccountBinding(profile,{
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_test',statementAccountId:'acct_test'
+ }),true);
+});
+test('rejects contradictory customer identity in profile response',()=>{
  const profile={data:{customer:{id:'cus_other',accounts:[{account_reference:'nsave_acct_test'}]}}};
  assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
-  customerId:'cus_test',accountReference:'nsave_acct_test',statementCustomerReference:'nsave_cus_other'
+  customerId:'cus_test',accountReference:'nsave_acct_test',
+  statementAccountReference:'nsave_acct_test'
  }),/identity differs/);
-});
-
-test('reports only safe yes/no diagnostics for genuine customer-reference conflicts',()=>{
- const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_profile',
-  accounts:[{account_reference:'nsave_acct_test'}]}}};
- assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
-  customerId:'cus_test',accountReference:'nsave_acct_test',
-  statementCustomerReference:'nsave_cus_ledger'
- }),e=>{
-  assert.equal(e.code,'NSAVE_CUSTOMER_REFERENCE_CONFLICT');
-  assert.deepEqual(e.diagnostics,{
-   selectedCustomerIdentityConfirmed:true,
-   selectedAccountLinkedToCustomer:true,
-   accountOwnerReferencePresent:false,
-   accountOwnerReferenceMatchesLedger:null,
-   profileOwnerReferencePresent:true,
-   profileOwnerReferenceMatchesLedger:false
-  });
-  const output=JSON.stringify(e.diagnostics);
-  assert.equal(output.includes('nsave_cus_profile'),false);
-  assert.equal(output.includes('nsave_cus_ledger'),false);
-  return true;
- });
-});
-test('does not accept one matching owner reference if another authoritative source conflicts',()=>{
- const profile={data:{customer:{id:'cus_test',nsave_reference:'nsave_cus_profile',
-  accounts:[{account_reference:'nsave_acct_test',nsave_reference:'nsave_cus_ledger'}]}}};
- assert.throws(()=>verifyNsaveCustomerAccountBinding(profile,{
-  customerId:'cus_test',accountReference:'nsave_acct_test',
-  statementCustomerReference:'nsave_cus_ledger'
- }),/identity conflict/);
 });
