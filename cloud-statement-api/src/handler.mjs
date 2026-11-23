@@ -142,7 +142,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           // opening/closing balance checkpoints, or issuer-approved statement PDFs.
           // Do not issue a downloadable statement from customer metadata.
           throw new HttpError(409,'ISSUER_LEDGER_NOT_CONNECTED',
-            'Official statement generation is unavailable: nSave ledger transactions, opening/closing balances and issuer-approved statement delivery are not yet connected.');
+            'This account may have zero transactions and can still qualify for a statement. LedgerDesk cannot issue an official statement until this workflow can retrieve verified opening/closing balances and issuer-approved statement delivery from the connected ledger.');
         }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
           const criteria=await readJson(req);
