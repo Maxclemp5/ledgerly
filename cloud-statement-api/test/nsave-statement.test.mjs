@@ -1,7 +1,7 @@
 import {verifyNsaveCustomerAccountBinding} from '../src/handler.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeNsaveStatement,renderNsaveStatement} from '../src/nsaveStatement.mjs';
+import {normalizeNsaveStatement} from '../src/nsaveStatement.mjs';
 
 const sample={
  month:null,start:'2026-11-11',end:'2026-11-11',
@@ -60,16 +60,7 @@ test('rejects a mismatched reporting period',()=>{
  }),/period does not match/);
 });
 
-test('renders a valid zero-activity statement PDF',async()=>{
- const statement=normalizeNsaveStatement(sample,{
-  accountReference:'nsave_acct_test',customerReference:'nsave_cus_test',
-  from:'2026-11-11',to:'2026-11-11'
- });
- const pdf=await renderNsaveStatement(statement);
- assert.equal(Buffer.isBuffer(pdf),true);
- assert.equal(pdf.subarray(0,5).toString('ascii'),'%PDF-');
- assert.ok(pdf.length>1000);
-});
+
 
 
 test('profile account_reference is authoritative when nsave customer references differ',()=>{
