@@ -119,7 +119,7 @@ function Profile({profile,onBack,api}){
       </div>:
       <p>The statement endpoint responded, but its account-summary fields are not mapped yet. The privacy-safe response structure is shown below; it contains field names and data types only, not customer values.</p>}
     <p>{result.transactions.length===0?'No transactions in this period.':'nSave returned '+result.transactions.length+' transaction records for this period.'}</p>
-    {result.record&&<p>Account reference verified: {value(result.record.account_reference)} · Request reference: {value(result.record.request_reference||result.schema?.fields?.request_reference?.type==='string'?'Available':'Returned by nSave')}</p>}
+    {result.record&&<p>Account reference verified: {value(result.record.account_reference)}</p>}
     <button type="button" className="old-primary" disabled={generating||checking} onClick={generatePdf}>{generating?'Generating PDF…':'Generate and download statement PDF'} <FileText size={15}/></button>
     {result.schema&&<details className="nsave-schema"><summary>View sanitized response structure</summary><pre>{JSON.stringify(result.schema,null,2)}</pre></details>}
    </div>}
