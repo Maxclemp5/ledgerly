@@ -7,6 +7,8 @@ import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.BaseFont;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.PdfDate;
+import com.lowagie.text.pdf.PdfName;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -19,6 +21,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Calendar;
+import java.util.TimeZone;
 
 /**
  * Native, single-pass statement renderer. The approved historical statement is
@@ -55,6 +59,12 @@ public final class StatementPdfRenderer {
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         Document document=new Document(new Rectangle(PAGE_W,PAGE_H),0,0,0,0);
         PdfWriter writer=PdfWriter.getInstance(document,out);
+        // One genuine issuance event: both dates refer to the same real instant.
+        // Never inherit or backdate either timestamp from the design reference.
+        Calendar issuedAt=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        PdfDate timestamp=new PdfDate(issuedAt);
+        writer.getInfo().put(PdfName.CREATIONDATE,timestamp);
+        writer.getInfo().put(PdfName.MODDATE,new PdfDate(issuedAt));
         document.addTitle("Account Statement "+s.path("currency").asText());
         document.addSubject("Account statement "+s.path("from").asText()+" to "+s.path("to").asText());
         document.addCreator("LedgerDesk OpenPDF statement issuance engine");
