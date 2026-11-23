@@ -1,0 +1,27 @@
+name: Verify Unified LedgerDesk Free Health
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-unified-free-live.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate API and embedded OpenPDF over public HTTPS
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 12 \
+               https://ledgerly-free-test-api.onrender.com/health/openpdf \
+               -o /tmp/pdf-health.json; then
+              cat /tmp/pdf-health.json
+              if grep -q '"upstream":"healthy"' /tmp/pdf-health.json; then
+                echo 'Live Node to embedded OpenPDF is healthy'
+                exit 0
+              fi
+            fi
+            sleep 6
+          done
+          echo 'Live embedded health not verified'
+          exit 1
