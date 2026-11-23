@@ -64,3 +64,18 @@ test('other authentication errors remain generic, including non-JSON responses',
    error.code==='NSAVE_AUTH_FAILED'&&error.upstreamStatus===401);
  }
 });
+
+test('date-scoped customer lookup passes start and end to nSave without altering credentials',async()=>{
+ let url,options;
+ const api=createNsaveClient({env,request:async(u,o)=>{url=u;options=o;return new Response('{}',{status:200})}});
+ await api.getCustomer('nsave_cus_test',{start:'2026-11-01',end:'2026-11-23'});
+ assert.equal(url,'https://nsave.work/api/v1/customers/nsave_cus_test?start=2026-11-01&end=2026-11-23');
+ assert.equal(options.headers['OAI-Sites-Authorization'],'Bearer site-secret');
+ assert.equal(options.headers.Authorization,'Bearer manager-secret');
+});
+test('date-scoped customer lookup rejects missing, malformed, reversed dates synchronously',()=>{
+ const api=createNsaveClient({env,request:async()=>new Response('{}',{status:200})});
+ assert.throws(()=>api.getCustomer('cus_test',{start:'2026-11-01'}),/Both statement/);
+ assert.throws(()=>api.getCustomer('cus_test',{start:'2026-13-01',end:'2026-11-23'}),/Invalid nSave/);
+ assert.throws(()=>api.getCustomer('cus_test',{start:'2026-11-23',end:'2026-11-01'}),/Invalid nSave/);
+});
