@@ -1,0 +1,35 @@
+name: OpenPDF Java Stamper CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud-statement-api/java-pdf-stamper/**'
+      - '.github/workflows/openpdf-stamper-ci.yml'
+  workflow_dispatch:
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud-statement-api/java-pdf-stamper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: cloud-statement-api/java-pdf-stamper/pom.xml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install template sanitation dependency
+        run: pip install PyMuPDF==1.26.6
+      - name: Sanitize issuer template background
+        run: python scripts/prepare_template.py
+      - name: Fetch Inter font for embedding
+        run: |
+          mkdir -p src/main/resources/fonts
+          curl -fL 'https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf' -o src/main/resources/fonts/Inter-Regular.ttf
+      - name: Maven build and OpenPDF tests
+        run: mvn -B --no-transfer-progress clean verify
