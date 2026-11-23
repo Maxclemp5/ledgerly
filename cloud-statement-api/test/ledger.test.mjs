@@ -27,3 +27,32 @@ test('does not accept different issuer',async()=>{
 test('fails closed when no actual issuer connector exists',async()=>{
  await assert.rejects(()=>reconcileIssuerLedger({},input),/not configured/);
 });
+
+test('accepts a new verified account with no posted transactions and zero balances',async()=>{
+ const verifiedEmpty={
+  ...stub,
+  async postedEntries(){return []},
+  async boundaryBalances(){return {openingMinor:0,closingMinor:0,currency:'USD',openingCheckpointId:'opening_verified',closingCheckpointId:'closing_verified'}}
+ };
+ const result=await reconcileIssuerLedger(verifiedEmpty,input);
+ assert.equal(result.postedEntryCount,0);
+ assert.equal(result.openingMinor,'0');
+ assert.equal(result.closingMinor,'0');
+ assert.equal(result.source,'AUTHENTICATED_ISSUER_LEDGER');
+});
+test('accepts empty activity with a nonzero unchanged verified balance',async()=>{
+ const verifiedEmpty={
+  ...stub,
+  async postedEntries(){return []},
+  async boundaryBalances(){return {openingMinor:5000,closingMinor:5000,currency:'USD',openingCheckpointId:'opening_verified',closingCheckpointId:'closing_verified'}}
+ };
+ const result=await reconcileIssuerLedger(verifiedEmpty,input);
+ assert.equal(result.postedEntryCount,0);
+ assert.equal(result.openingMinor,result.closingMinor);
+});
+test('rejects empty activity when ledger checkpoints do not reconcile',async()=>{
+ await assert.rejects(()=>reconcileIssuerLedger({
+  ...stub,async postedEntries(){return []},
+  async boundaryBalances(){return {openingMinor:0,closingMinor:1,currency:'USD',openingCheckpointId:'a',closingCheckpointId:'b'}}
+ },input),/reconcile/);
+});
