@@ -26,7 +26,7 @@ test('nSave client rejects missing credentials and invalid search fields',async(
  const api=createNsaveClient({env:{},request:async()=>{throw Error('must not call')}});
  await assert.rejects(()=>api.listCustomers(),/credentials/);
  const ready=createNsaveClient({env,request:async()=>new Response('{}',{status:200})});
- await assert.rejects(()=>ready.searchCustomer({email:'x@y.test'}),/exact account number or full customer name/);
+ assert.throws(()=>ready.searchCustomer({email:'x@y.test'}),/exact account number or full customer name/);
 });
 
 test('nSave client keeps upstream 401/403 status without exposing credentials',async()=>{
@@ -41,5 +41,26 @@ test('account-number lookup preserves leading zeros and rejects non-digits',asyn
  const api=createNsaveClient({env,request:async(_url,options)=>{body=options.body;return new Response('{}',{status:200})}});
  await api.searchCustomer({account_number:'00000123'});
  assert.equal(body,'{"account_number":"00000123"}');
- await assert.rejects(()=>api.searchCustomer({account_number:'123-456'}),/exact account number/);
+ assert.throws(()=>api.searchCustomer({account_number:'123-456'}),/exact account number/);
+});
+
+test('exact Fly service-token rejection gets dedicated internal code on 401 and 403',async()=>{
+ for(const upstreamStatus of [401,403]){
+  const api=createNsaveClient({env,request:async()=>new Response(
+   JSON.stringify({error:'Service authorization required.'}),{status:upstreamStatus}
+  )});
+  await assert.rejects(()=>api.listCustomers({limit:1}),error=>
+   error.code==='NSAVE_SERVICE_TOKEN_REJECTED'&&error.upstreamStatus===upstreamStatus);
+ }
+});
+test('other authentication errors remain generic, including non-JSON responses',async()=>{
+ for(const body of [
+  JSON.stringify({error:'Invalid manager API key'}),
+  JSON.stringify({error:'Service authorization required'}),
+  '<html>Unauthorized</html>'
+ ]){
+  const api=createNsaveClient({env,request:async()=>new Response(body,{status:401})});
+  await assert.rejects(()=>api.listCustomers({limit:1}),error=>
+   error.code==='NSAVE_AUTH_FAILED'&&error.upstreamStatus===401);
+ }
 });
