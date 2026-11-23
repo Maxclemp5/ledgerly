@@ -24,7 +24,7 @@ function safeShape(value,depth=0){
 // The nSave customer directory uses cus_<id> while the statement ledger uses
 // nsave_cus_<id>. Resolve only this documented prefix translation, and never
 // accept a ledger-provided reference as proof of account ownership by itself.
-function canonicalNsaveCustomerReference(customerId){
+export function canonicalNsaveCustomerReference(customerId){
   if(/^nsave_cus_[A-Za-z0-9_-]+$/.test(customerId))return customerId;
   if(/^cus_[A-Za-z0-9_-]+$/.test(customerId))return 'nsave_'+customerId;
   return null;
