@@ -213,6 +213,9 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
         return send(res,409,{error:{code:'NOT_VERIFIED',message:'Account is not issuer-verified'}},origin);
       if(error instanceof HttpError)
         return send(res,error.status,{error:{code:error.code,message:error.message}},origin);
+      if(error?.code==='NSAVE_SERVICE_TOKEN_REJECTED')
+        return send(res,502,{error:{code:'NSAVE_SERVICE_TOKEN_REJECTED',
+          message:"nSave rejected the service token. Check Render's NSAVE_SITE_SERVICE_TOKEN against Fly's LEDGER_SERVICE_TOKEN."}},origin);
       if(error?.code==='NSAVE_AUTH_FAILED')
         return send(res,502,{error:{code:error.code,message:error.upstreamStatus===403?
           'nSave denied access (403). Check Site token and manager key organization permissions.':
