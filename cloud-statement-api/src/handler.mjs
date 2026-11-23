@@ -21,6 +21,14 @@ function safeShape(value,depth=0){
   }
   return {type:typeof value};
 }
+// The nSave customer directory uses cus_<id> while the statement ledger uses
+// nsave_cus_<id>. Resolve only this documented prefix translation, and never
+// accept a ledger-provided reference as proof of account ownership by itself.
+function canonicalNsaveCustomerReference(customerId){
+  if(/^nsave_cus_[A-Za-z0-9_-]+$/.test(customerId))return customerId;
+  if(/^cus_[A-Za-z0-9_-]+$/.test(customerId))return 'nsave_'+customerId;
+  return null;
+}
 function sendPdf(res,buffer,filename,origin=''){
   res.writeHead(200,{
     'content-type':'application/pdf',
@@ -172,11 +180,10 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/statements/generate'){
           const data=await readJson(req);
           const customerId=input(data,'customerId',160);
-          const customerReference=input(data,'customerReference',160);
           const accountReference=input(data,'accountReference',160);
           const {from,to}=validPeriod(data);
-          if(!/^[A-Za-z0-9_-]+$/.test(customerId)||!/^nsave_[A-Za-z0-9_-]+$/.test(customerReference)||
-             !/^nsave_[A-Za-z0-9_-]+$/.test(accountReference))
+          const customerReference=canonicalNsaveCustomerReference(customerId);
+          if(!customerReference||!/^nsave_[A-Za-z0-9_-]+$/.test(accountReference))
             throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
           const organizations=await store.listManagerOrganizations(user.uid);
           if(!organizations.length)
