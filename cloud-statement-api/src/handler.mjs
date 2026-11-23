@@ -3,6 +3,23 @@ import {URL} from 'node:url';
 export class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status=status; this.code=code; }
 }
+// Return response structure only: never include scalar values, account numbers,
+// names, addresses, transaction descriptions, or other customer content.
+function safeShape(value,depth=0){
+  if(value===null)return {type:'null'};
+  if(Array.isArray(value)){
+    const first=value[0];
+    return {type:'array',length:value.length,
+      itemShape:first===undefined?null:safeShape(first,depth+1)};
+  }
+  if(typeof value==='object'){
+    if(depth>=5)return {type:'object',truncated:true};
+    const entries=Object.entries(value).slice(0,80);
+    return {type:'object',fields:Object.fromEntries(entries.map(([key,v])=>
+      [key,safeShape(v,depth+1)])),truncated:Object.keys(value).length>80};
+  }
+  return {type:typeof value};
+}
 function send(res,status,data,origin='') {
   res.writeHead(status,{
     'content-type':'application/json; charset=utf-8',
@@ -152,7 +169,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           const statement=await nsave.getStatement(accountId,{start:from,end:to});
           return send(res,200,{data:{source:'NSAVE_STATEMENTS_API',
             customerId,accountReference:accountId,issuerOrgId:organizations[0].issuerOrgId,
-            from,to,statement,
+            from,to,statement,statementSchema:safeShape(statement),
             officialStatementReady:true,
             note:'Statement data retrieved from the approved nSave statements endpoint.'}},origin);
         }
