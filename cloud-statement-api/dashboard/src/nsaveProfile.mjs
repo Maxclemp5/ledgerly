@@ -36,7 +36,7 @@ export function nsaveAddressText(raw){
   a.postal_code||a.postalCode||a.zip,a.country].filter(Boolean).join(', ');
 }
 export function nsaveUnpack(raw){
- const obj=nsaveObject(raw?.data)||nsaveObject(raw);
+ const obj=raw?.data&&typeof raw.data==='object'&&!Array.isArray(raw.data)?raw.data:nsaveObject(raw);
  const inner=Array.isArray(raw?.data)?raw.data:Array.isArray(obj?.data)?obj.data:
   Array.isArray(obj?.customers)?obj.customers:Array.isArray(obj?.results)?obj.results:
   Array.isArray(obj?.matches)?obj.matches:Array.isArray(obj?.items)?obj.items:
