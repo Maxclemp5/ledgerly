@@ -1,3 +1,4 @@
+import {canonicalNsaveCustomerReference} from '../src/handler.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeNsaveStatement,renderNsaveStatement} from '../src/nsaveStatement.mjs';
@@ -68,4 +69,13 @@ test('renders a valid zero-activity statement PDF',async()=>{
  assert.equal(Buffer.isBuffer(pdf),true);
  assert.equal(pdf.subarray(0,5).toString('ascii'),'%PDF-');
  assert.ok(pdf.length>1000);
+});
+
+test('customer directory ID canonically maps to the ledger nsave_reference',()=>{
+ assert.equal(canonicalNsaveCustomerReference('cus_a1b842ae1c1a467a9a389a1fbb544cce'),
+  'nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce');
+ assert.equal(canonicalNsaveCustomerReference('nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce'),
+  'nsave_cus_a1b842ae1c1a467a9a389a1fbb544cce');
+ assert.equal(canonicalNsaveCustomerReference('cus_other'), 'nsave_cus_other');
+ for(const unsafe of ['acct_123','cus_../../other','cus_/x',''])assert.equal(canonicalNsaveCustomerReference(unsafe),null);
 });
