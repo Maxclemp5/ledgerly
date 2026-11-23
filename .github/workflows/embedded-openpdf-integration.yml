@@ -1,0 +1,63 @@
+name: Embedded OpenPDF Docker Integration
+on:
+  push:
+    paths:
+      - 'cloud-statement-api/Dockerfile'
+      - 'cloud-statement-api/src/**'
+      - 'cloud-statement-api/java-pdf-stamper/**'
+      - '.github/workflows/embedded-openpdf-integration.yml'
+  workflow_dispatch:
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the actual Free Render Docker context
+        run: docker build -t ledgerdesk-unified-test -f cloud-statement-api/Dockerfile cloud-statement-api
+      - name: Launch Node and the locally supervised OpenPDF engine
+        run: |
+          docker run -d --name ledgerdesk-unified-test --publish 127.0.0.1:18080:10000 \
+            -e 'ALLOWED_WEB_ORIGIN=https://example.test' \
+            -e 'NEON_AUTH_BASE_URL=https://example.test/auth' \
+            -e 'NEON_AUTH_JWKS_URL=https://example.test/auth/jwks' \
+            -e 'DATABASE_URL=postgres://demo:demo@127.0.0.1:5432/demo' \
+            -e 'PDF_STAMPER_TOKEN=0123456789abcdefghijklmnopqrstuvwxyz' \
+            ledgerdesk-unified-test
+      - name: Assert Node-to-Java readiness over localhost
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 4 http://127.0.0.1:18080/health/openpdf | grep -q '"upstream":"healthy"'; then
+              echo 'Manager API → embedded Java healthy'; exit 0
+            fi
+            sleep 2
+          done
+          docker logs ledgerdesk-unified-test
+          exit 1
+      - name: Generate actual synthetic PDF through local Java render endpoint
+        run: |
+          docker exec ledgerdesk-unified-test node --input-type=module -e '
+            import assert from "node:assert/strict";
+            const body = {
+              requestReference:"ci-test",accountReference:"acc-ci",customerName:"Example Test User",
+              address:"10 Example Street",bankName:"EXAMPLE BANK",
+              bankAddress:"100 Example Avenue",accountNumber:"000000000012",
+              routingNumber:"021214891",currency:"USD",from:"2026-11-01",to:"2026-11-01",
+              opening:0,deposits:0,payments:0,closing:0,transactions:[]
+            };
+            const response=await fetch("http://127.0.0.1:10001/render",{
+              method:"POST",headers:{authorization:"Bearer 0123456789abcdefghijklmnopqrstuvwxyz","content-type":"application/json"},
+              body:JSON.stringify(body)
+            });
+            assert.equal(response.status,200,await response.text().catch(()=>"<unreadable>"));
+            const pdf=new Uint8Array(await response.arrayBuffer());
+            assert.equal(new TextDecoder().decode(pdf.slice(0,5)),"%PDF-");
+            assert.ok(pdf.length>1000);
+            console.log("Synthetic PDF produced by co-located Java, bytes:",pdf.length);
+          '
+      - name: Print sanitized diagnostics on failure
+        if: failure()
+        run: docker logs ledgerdesk-unified-test || true
+      - name: Cleanup
+        if: always()
+        run: docker rm -f ledgerdesk-unified-test || true
