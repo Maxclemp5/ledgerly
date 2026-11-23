@@ -49,7 +49,7 @@ jobs:
               method:"POST",headers:{authorization:"Bearer 0123456789abcdefghijklmnopqrstuvwxyz","content-type":"application/json"},
               body:JSON.stringify(body)
             });
-            assert.equal(response.status,200,await response.text().catch(()=>"<unreadable>"));
+            if(response.status!==200) throw new Error("Renderer HTTP "+response.status+" "+await response.text());
             const pdf=new Uint8Array(await response.arrayBuffer());
             assert.equal(new TextDecoder().decode(pdf.slice(0,5)),"%PDF-");
             assert.ok(pdf.length>1000);
