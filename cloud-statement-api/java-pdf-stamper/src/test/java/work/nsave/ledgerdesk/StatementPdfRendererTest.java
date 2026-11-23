@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lowagie.text.pdf.PdfReader;
 import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StatementPdfRendererTest {
@@ -19,11 +21,15 @@ class StatementPdfRendererTest {
           """);
         byte[] pdf=renderer.render(s);
         assertTrue(pdf.length>20_000);
+        Files.createDirectories(Path.of("target"));
+        Files.write(Path.of("target/native-layout-preview.pdf"),pdf);
         PdfReader reader=new PdfReader(new ByteArrayInputStream(pdf));
         try {
             assertEquals(1,reader.getNumberOfPages());
             assertEquals(612f,reader.getPageSize(1).getWidth(),.1f);
             assertEquals(792f,reader.getPageSize(1).getHeight(),.1f);
+            assertTrue(reader.getInfo().getOrDefault("Creator", "").contains("LedgerDesk OpenPDF"));
+            assertFalse(reader.getInfo().getOrDefault("Producer", "").contains("Quartz PDFContext"));
         } finally { reader.close(); }
     }
     @Test void rejectsUnreconciledBalances() throws Exception {
