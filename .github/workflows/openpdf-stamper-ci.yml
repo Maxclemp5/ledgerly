@@ -33,3 +33,11 @@ jobs:
         run: python scripts/extract_design_assets.py
       - name: Maven build and OpenPDF tests
         run: mvn -B --no-transfer-progress clean verify
+      - name: Upload native PDF layout preview for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-openpdf-layout-preview
+          path: cloud-statement-api/java-pdf-stamper/target/native-layout-preview.pdf
+          if-no-files-found: warn
+          retention-days: 7
