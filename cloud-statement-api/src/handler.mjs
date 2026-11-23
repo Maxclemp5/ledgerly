@@ -211,7 +211,9 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       if(res.headersSent)return;
       if(error?.name==='SourceNotVerified')
         return send(res,409,{error:{code:'NOT_VERIFIED',message:'Account is not issuer-verified'}},origin);
-      if(error?.code==='NSAVE_AUTH_FAILED')return send(res,502,{error:{code:error.code,message:'nSave rejected the configured credentials. Ask the nSave administrator to issue/confirm an active key.'}},origin);\n      if(error?.code==='UPSTREAM_RATE_LIMIT')return send(res,429,{error:{code:error.code,message:'nSave API rate limit reached. Please retry later.'}},origin);\n      if(error?.code==='NSAVE_API_ERROR')return send(res,502,{error:{code:error.code,message:'nSave API request failed.'}},origin);\n      if(error instanceof HttpError)
+      if(error?.code==='NSAVE_AUTH_FAILED')return send(res,502,{error:{code:error.code,message:'nSave rejected the configured credentials. Ask the nSave administrator to issue/confirm an active key.'}},origin);
+      if(error?.code==='UPSTREAM_RATE_LIMIT')return send(res,429,{error:{code:error.code,message:'nSave API rate limit reached. Please retry later.'}},origin);
+      if(error?.code==='NSAVE_API_ERROR')return send(res,502,{error:{code:error.code,message:'nSave API request failed.'}},origin);
         return send(res,error.status,{error:{code:error.code,message:error.message}},origin);
       logger.error('Statement API internal error',error?.name||'UnknownError');
       return send(res,503,{error:{code:'SERVICE_NOT_READY',message:'Issuer ledger service unavailable'}},origin);
