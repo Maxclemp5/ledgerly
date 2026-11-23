@@ -83,23 +83,23 @@ export async function renderNsaveStatement(statement){
  }});
  const chunks=[];
  const done=new Promise((resolve,reject)=>{doc.on('data',x=>chunks.push(x));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.on('error',reject)});
- const ink='#111111',muted='#77736f',rule='#dedbd8',left=36,right=576;
+ const ink='#111111',muted='#77736f',rule='#dedbd8',left=15,right=597;
  const moneyText=v=>money(v,statement.currency);
  const dateText=v=>{const [y,m,d]=v.split('-');return d+'/'+m+'/'+y};
- doc.font('Helvetica-Bold').fontSize(19).fillColor(ink).text('Account Statement '+statement.currency,left,58,{lineBreak:false});
- doc.font('Helvetica').fontSize(10).fillColor(muted).text(dateText(statement.from)+' - '+dateText(statement.to),left,82);
- doc.font('Helvetica-Bold').fontSize(21).fillColor(ink).text('nsave',475,58,{width:100,align:'right'});
+ doc.font('Helvetica-Bold').fontSize(19).fillColor(ink) .text('Account Statement '+statement.currency,left,93,{lineBreak:false});
+ doc.font('Helvetica').fontSize(10).fillColor(muted) .text(dateText(statement.from)+' - '+dateText(statement.to),left,121);
+ doc.font('Helvetica-Bold').fontSize(21).fillColor(ink) .text('nsave',500,92,{width:82,align:'right'});
  const line=(y)=>doc.moveTo(left,y).lineTo(right,y).lineWidth(.55).strokeColor(rule).stroke();
  const label=(t,x,y)=>doc.font('Helvetica-Bold').fontSize(9).fillColor(ink).text(t,x,y,{lineBreak:false});
  const val=(t,x,y,w=245)=>doc.font('Helvetica').fontSize(9).fillColor(muted).text(String(t),x,y,{width:w,lineBreak:false});
- label('Name',left,122);val(statement.customerName,178,122);
- label('Address',left,141);val(statement.address,178,141,250);
- label('Bank',left,198);val(statement.bankName,178,198);
- label('Bank Address',left,218);val(statement.bankAddress,178,218,360);
- label('Account Number',left,238);val(statement.accountNumber,178,238);
- if(statement.routingNumber){label('Routing Number',left,258);val(statement.routingNumber,178,258);}
+ label('Name',left,155);val(statement.customerName,158,155);
+ label('Address',left,175);val(statement.address,158,175,250);
+ label('Bank',left,232);val(statement.bankName,158,232);
+ label('Bank Address',left,254);val(statement.bankAddress,158,254,360);
+ label('Account Number',left,275);val(statement.accountNumber,158,275);
+ if(statement.routingNumber){label('Routing Number',left,296);val(statement.routingNumber,158,296);}
  const sumX=390,sumV=532;
- const sumY=statement.routingNumber?238:258;
+ const sumY=275;
  const summary=[
   ['Opening Balance',moneyText(statement.opening)],
   ['Closing Balance',moneyText(statement.closing)],
@@ -107,8 +107,8 @@ export async function renderNsaveStatement(statement){
   ['Total Deposits',moneyText(statement.deposits)]
  ];
  summary.forEach(([k,v],i)=>{label(k,sumX,sumY+i*20);val(v,sumV,sumY+i*20,45);});
- const tableY=Math.max(statement.routingNumber?296:276,sumY+92);
- const col={date:left,desc:118,amount:410,balance:520};
+ const tableY=368;
+ const col={date:left,desc:118,amount:410,balance:540};
  doc.font('Helvetica').fontSize(9).fillColor(muted);
  doc.text('Date',col.date,tableY,{lineBreak:false});
  doc.text('Description',col.desc,tableY,{lineBreak:false});
@@ -131,9 +131,16 @@ export async function renderNsaveStatement(statement){
    y+=h;line(y-3);
   }
  }
+ // Reproduce the circular nSave seal placement from the supplied statement layout.
+ doc.save();
+ doc.circle(365,400,34).lineWidth(1.6).strokeColor('#252525').stroke();
+ doc.circle(365,400,29).lineWidth(.6).strokeColor('#252525').stroke();
+ doc.font('Helvetica-Bold').fontSize(17).fillColor('#252525').text('n',350,389,{width:30,align:'center'});
+ doc.font('Helvetica-Bold').fontSize(5.5).fillColor('#252525').text('nsave Ltd.  ·  npay USA Inc.',326,374,{width:78,align:'center'});
+ doc.restore();
  // Nsave's supplied corporate disclosure footer from the existing template.
  const footer='© nsave Ltd. 2026 registered in England and Wales under number 14337994. npay USA Inc. is a company incorporated in Montana, USA and registered as a Money Services Business (MSB) with FinCEN under registration number: 31000342363468. GBP and Multi-Currency accounts are offered by Keel Money Ltd. authorised by the Financial Conduct Authority under the Electronic Money Regulations 2011 (FRN: 1020783) for the issuing of electronic money and payment instruments.';
- const footerY=Math.max(y+62,620);
+ const footerY=Math.max(y+62,465);
  doc.font('Helvetica').fontSize(8).fillColor(muted).text(footer,left,footerY,{width:right-left,align:'left',lineGap:1});
  doc.end();
  return done;
