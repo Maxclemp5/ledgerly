@@ -29,9 +29,10 @@ function Profile({profile,onBack,api}){
    const pulled=await api('/v1/manager/nsave/statement-readiness',{method:'POST',body:{
     customerId:id,accountId:selected,from,to
    }});
-   const raw=pulled?.profile?.data||pulled?.profile||{};
-   const summary=raw?.account_summary||raw?.accountSummary||raw?.ledger_summary||raw?.ledgerSummary||raw?.summary||raw?.data?.account_summary||{};
-   setResult({summary,from,to,note:pulled?.note||'nSave period data retrieved.'});
+   const raw=pulled?.statement?.data||pulled?.statement||{};
+   const summary=raw?.account_summary||raw?.accountSummary||raw?.ledger_summary||raw?.ledgerSummary||raw?.summary||raw?.data?.account_summary||raw?.statement_summary||{};
+   const transactions=raw?.transactions||raw?.items||raw?.entries||raw?.data?.transactions||[];
+   setResult({summary,transactions:Array.isArray(transactions)?transactions:[],fields:Object.keys(raw||{}),from,to,note:pulled?.note||'nSave statement data retrieved.'});
   }catch(err){setError(err.message||'Unable to retrieve nSave date-scoped summary.')}finally{setChecking(false)}
  }
  return <div className="old-card">
@@ -55,10 +56,10 @@ function Profile({profile,onBack,api}){
     {revealAccounts?<EyeOff size={15}/>:<Eye size={15}/>}
     {revealAccounts?'Hide account numbers':'Show full account numbers'}
    </button></div>
-  {!accounts.length?<p>Linked bank-account details are not included in the nSave profile response. The customer record loaded, but no account list was supplied by this endpoint.</p>:
+  {!accounts.length?<p>Linked bank-account details are not included in the nSave profile response. The customer record loaded, but no account list was supplied by this endpoint. Statement generation requires the nSave account reference.</p>:
    <div className="old-overflow"><table><thead><tr><th>Select</th><th>Account</th><th>Bank</th><th>Currency</th><th>Status</th></tr></thead>
     <tbody>{accounts.map((a,i)=>{
-     const aid=String(a.id||a.account_id||a.accountId||a.account_reference||a.accountReference||'');
+     const aid=String(a.account_reference||a.accountReference||a.nsave_account_reference||a.id||a.account_id||a.accountId||'');
      return <tr key={aid||i}>
       <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||a.accountNumber||a.iban||aid)}
        checked={selected===aid&&!!aid} disabled={!aid} onChange={()=>{setSelected(aid);setError('');setResult('')}}/></td>
@@ -77,7 +78,7 @@ function Profile({profile,onBack,api}){
      <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)} required/></label>
      <label>To<input type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)} required/></label>
     </div>
-    <button type="submit" className="old-primary" disabled={!selected||checking}>{checking?'Loading period data…':'Fetch account summary'} <ChevronRight size={15}/></button>
+    <button type="submit" className="old-primary" disabled={!selected||checking}>{checking?'Loading period data…':'Fetch statement data'} <ChevronRight size={15}/></button>
    </form>
    {error&&<div className="old-alert error" role="alert">{error}</div>}
    {result&&<div className="old-card" role="status">
@@ -90,12 +91,12 @@ function Profile({profile,onBack,api}){
         ['Closing balance',result.summary.closing_balance??result.summary.closingBalance],
         ['Total deposits',result.summary.total_deposits??result.summary.totalDeposits],
         ['Total payments',result.summary.total_payments??result.summary.totalPayments],
-        ['Currency',result.summary.currency]
+        ['Currency',result.summary.currency||result.raw?.currency]
        ].filter(([,v])=>v!==undefined&&v!==null).map(([label,v])=>
         <Field key={label} label={label}>{value(v)}</Field>)}
       </div>:
-      <p>No recognized account-summary fields were returned for the selected period. The dated profile request succeeded, but the response needs additional ledger field mapping.</p>}
-    <p>No official statement has been issued by this preview.</p>
+      <p>The statement endpoint responded, but its account-summary fields are not mapped yet. Returned data sections: {result.fields.join(', ')||'none'}. Please check the endpoint response mapping.</p>}
+    <p>nSave returned {result.transactions.length} transaction record(s) for this period. PDF issuance will be enabled after the response fields are mapped and reconciled against the supplied template.</p>
    </div>}
    <p><ShieldCheck size={13}/> No transactions during a period is valid. Statement PDF delivery requires issuer-verified opening and closing balances and an authorized statement source.</p>
   </div>
