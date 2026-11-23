@@ -50,6 +50,57 @@ function GridTable({rows,kind}){
   <td>{r.eventType}</td><td>{r.targetId}</td><td>{r.issuerOrgId}</td><td>{niceDate(r.createdAt)}</td>
   </>:<><td>{r.customerId}</td><td>{r.accountId}</td><td>{niceDate(r.from)} – {niceDate(r.to)}</td><td><span className="old-chip">{String(r.status).replaceAll('_',' ')}</span></td><td>{niceDate(r.createdAt)}</td></>}</tr>)}</tbody></table></div>;
 }
+function nsaveMatches(payload){
+ const raw=Array.isArray(payload)?payload:
+  Array.isArray(payload?.customers)?payload.customers:
+  Array.isArray(payload?.matches)?payload.matches:
+  Array.isArray(payload?.results)?payload.results:
+  Array.isArray(payload?.data)?payload.data:
+  payload?.customer?[payload.customer]:
+  payload?.data&&typeof payload.data==='object'?[payload.data]:
+  payload&&typeof payload==='object'&&!('next_offset' in payload)?[payload]:[];
+ return raw.filter(x=>x&&typeof x==='object'&&!Array.isArray(x));
+}
+function NsaveLookup({api}){
+ const [mode,setMode]=useState('account_number'),[query,setQuery]=useState('');
+ const [results,setResults]=useState([]),[searched,setSearched]=useState(false);
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function search(event){
+  event.preventDefault();
+  const value=query.trim();setError('');setResults([]);setSearched(false);
+  if(!value){setError('Enter a bank account number or full customer name.');return}
+  if(mode==='account_number'&&!/^[0-9]+$/.test(value)){setError('Enter the exact bank account number using digits only, including any leading zeros.');return}
+  if(value.length>160){setError('Search text must be 160 characters or fewer.');return}
+  setBusy(true);
+  try{
+   const response=await api('/v1/manager/nsave/customers/search',{method:'POST',body:{[mode]:value}});
+   setResults(nsaveMatches(response));setSearched(true);
+  }catch(e){setError(e.message||'nSave lookup failed.');}finally{setBusy(false)}
+ }
+ return <div className="old-card">
+  <div className="old-bar"><div><h2>nSave customer lookup</h2><p>Search live nSave customer records. This does not search internal LedgerDesk profiles.</p></div></div>
+  <form className="old-form" onSubmit={search}>
+   <label>Search type<select value={mode} onChange={e=>{setMode(e.target.value);setQuery('');setResults([]);setSearched(false);setError('')}}>
+     <option value="account_number">Exact bank account number</option>
+     <option value="name">Full customer name</option>
+   </select></label>
+   <label>{mode==='account_number'?'Bank account number':'Customer full name'}
+    <input aria-label="nSave customer lookup" autoComplete="off" maxLength={160} value={query} onChange={e=>setQuery(e.target.value)}
+     placeholder={mode==='account_number'?'Include all digits and leading zeros':'Enter full name exactly'} required/>
+   </label>
+   <button type="submit" className="old-primary" disabled={busy}>{busy?'Searching nSave…':'Search nSave'} <Search size={16}/></button>
+  </form>
+  <Alert error={error}/>
+  {searched&&(results.length===0?<Empty title="No nSave matches" detail="No matching customer was returned by nSave for that exact search."/>:
+   <div className="old-overflow"><table><thead><tr><th>Customer</th><th>nSave reference</th><th>Verification</th></tr></thead>
+    <tbody>{results.map((item,i)=><tr key={String(item.id||item.customer_id||item.customerId||i)}>
+     <td><b>{String(item.full_name||item.fullName||item.name||[item.first_name,item.last_name].filter(Boolean).join(' ')||'Name not provided')}</b></td>
+     <td className="old-id">{String(item.id||item.customer_id||item.customerId||item.nsave_reference||'—')}</td>
+     <td><span className="old-chip">{String(item.kyc_status||item.kycStatus||item.status||'Not provided')}</span></td>
+    </tr>)}</tbody></table>
+   <p>Bank account numbers and other sensitive fields are not displayed in these search results.</p></div>)}
+ </div>;
+}
 function Customers({api,orgs,changed}){
  const [data,setData]=useState([]),[query,setQuery]=useState(''),[applied,setApplied]=useState('');
  const [editing,setEditing]=useState(null),[open,setOpen]=useState(false);
@@ -77,7 +128,8 @@ function Customers({api,orgs,changed}){
   catch(e){setError(e.message)}
  }
  return <>
-  <div className="old-bar"><div><h2>Customer management</h2><p>Add and manage profiles for your authorized issuer.</p></div><button className="old-primary" onClick={()=>start()}><Plus size={16}/> Add Customer</button></div>
+  <NsaveLookup api={api}/>
+  <div className="old-bar"><div><h2>Internal customer management</h2><p>Manage separate, unverified LedgerDesk profiles for your authorized issuer.</p></div><button className="old-primary" onClick={()=>start()}><Plus size={16}/> Add Customer</button></div>
   <Alert error={error} ok={ok}/>
   {open&&<div className="old-card old-edit"><div className="old-bar"><h2>{editing?'Edit Customer':'New Customer'}</h2><button className="old-secondary" onClick={()=>setOpen(false)}>Close</button></div>
    <form className="old-form" onSubmit={save}>
@@ -88,7 +140,7 @@ function Customers({api,orgs,changed}){
     <button type="submit" className="old-primary" disabled={busy}>{busy?'Saving…':editing?'Save changes':'Create customer'}</button>
    </form></div>}
   <div className="old-card">
-   <form className="old-search" onSubmit={e=>{e.preventDefault();setApplied(query.trim())}}><Search size={18}/><input aria-label="Search customers" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by customer name or ID"/><button className="old-secondary" type="submit">Search</button></form>
+   <form className="old-search" onSubmit={e=>{e.preventDefault();setApplied(query.trim())}}><Search size={18}/><input aria-label="Search customers" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search internal customer name or ID"/><button className="old-secondary" type="submit">Search</button></form>
    {loading?<p className="old-loading">Loading…</p>:!data.length?<Empty title="No customers yet" detail="Add an internal customer record to begin. Bank verification remains issuer-controlled."/>:
    <div className="old-overflow"><table><thead><tr><th>Name</th><th>Customer ID</th><th>Organization</th><th>Status</th><th>Actions</th></tr></thead><tbody>{data.map(row=><tr key={row.customerId}>
     <td><b>{row.displayName}</b><small>{row.email||'No email'}</small></td><td className="old-id">{row.customerId}</td><td>{row.issuerOrgId}</td><td><span className="old-chip">Unverified</span></td>
