@@ -66,7 +66,7 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
       statementAccountId!==null&&statementAccountId!==undefined&&statementAccountId!==''
       &&profileAccountId!==statementAccountId)
     throw new Error('Statement account ID does not match the authenticated customer profile');
-  return true;
+  return {accountReference,accountId:account.account_id??account.accountId??null};
 }
 async function renderWithOpenPdf(statement){
   const base=process.env.PDF_STAMPER_URL;
