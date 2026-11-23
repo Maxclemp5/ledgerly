@@ -71,7 +71,7 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
     routingNumber:typeof routingRaw==='string'?routingRaw.trim():''};
 }
 async function renderWithOpenPdf(statement){
-  const base=process.env.PDF_STAMPER_URL;
+  const base=process.env.LEDGERDESK_EMBEDDED_PDF_URL||process.env.PDF_STAMPER_URL;
   const token=process.env.PDF_STAMPER_TOKEN;
   if(!base||!token)throw new HttpError(503,'PDF_STAMPER_NOT_CONFIGURED','The approved OpenPDF rendering service is not configured.');
   // Render Free instances may need to wake after inactivity. A 502 from the
@@ -246,7 +246,7 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       if(req.method==='GET'&&url.pathname==='/health/openpdf'){
         // Operational probe: no auth token, statement fields, or upstream URL exposed.
         let upstream='network_error';
-        const base=process.env.PDF_STAMPER_URL;
+        const base=process.env.LEDGERDESK_EMBEDDED_PDF_URL||process.env.PDF_STAMPER_URL;
         if(!base)return send(res,503,{ok:false,upstream:'not_configured'},origin);
         try{
           const target=new URL('/health',base);
