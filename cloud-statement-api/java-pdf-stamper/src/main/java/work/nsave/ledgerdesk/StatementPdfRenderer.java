@@ -79,9 +79,9 @@ public final class StatementPdfRenderer {
 
     private void drawHeader(PdfContentByte c,JsonNode s,boolean continued) throws Exception {
         String header="Account Statement "+s.path("currency").asText()+(continued?" (continued)":"");
-        text(c,semibold,header,continued?16f:20.6f,15.3f,682.5f,INK,520f);
+        text(c,semibold,header,continued?16f:20.6f,15.3f,683.4f,INK,520f);
         text(c,regular,date(s.path("from").asText())+" - "+date(s.path("to").asText()),
-             13.8f,15.3f,659.5f,MUTED,360f);
+             13.8f,15.3f,660.0f,MUTED,360f);
         Image image=Image.getInstance(logo);
         image.scaleAbsolute(86.01f,23.23f);
         image.setAbsolutePosition(510.7f,680.69f);
@@ -89,22 +89,22 @@ public final class StatementPdfRenderer {
     }
 
     private void drawCustomer(PdfContentByte c,JsonNode s) throws Exception {
-        pair(c,"Name",s.path("customerName").asText(),629.5f,205f);
-        label(c,"Address",15.3f,609.7f);
+        pair(c,"Name",s.path("customerName").asText(),629.9f,205f);
+        label(c,"Address",15.3f,610.2f);
         List<String> address=wrap(s.path("address").asText(),regular,10.3f,210f);
         if(address.size()>3)throw new IllegalArgumentException("Address does not fit the approved master layout");
-        for(int i=0;i<address.size();i++)text(c,regular,address.get(i),10.3f,158.1f,609.7f-i*12.9f,MUTED,215f);
-        pair(c,"Bank",s.path("bankName").asText().toUpperCase(Locale.US),541.5f,210f);
-        pair(c,"Bank Address",s.path("bankAddress").asText(),521.7f,355f);
-        pair(c,"Account Number",s.path("accountNumber").asText(),501.9f,200f);
+        for(int i=0;i<address.size();i++)text(c,regular,address.get(i),10.3f,158.1f,610.2f-i*12.9f,MUTED,215f);
+        pair(c,"Bank",s.path("bankName").asText().toUpperCase(Locale.US),551.7f,210f);
+        pair(c,"Bank Address",s.path("bankAddress").asText(),531.9f,355f);
+        pair(c,"Account Number",s.path("accountNumber").asText(),512.1f,200f);
         String route=s.path("routingNumber").asText("");
-        label(c,"Routing Number",15.3f,482.1f);
-        if(!route.isBlank())text(c,regular,route,10.3f,158.1f,482.1f,MUTED,200f);
+        label(c,"Routing Number",15.3f,492.3f);
+        if(!route.isBlank())text(c,regular,route,10.3f,158.1f,492.3f,MUTED,200f);
 
         String[] lbl={"Opening Balance","Closing Balance","Total Payments","Total Deposits"};
         String[] keys={"opening","closing","payments","deposits"};
         for(int i=0;i<lbl.length;i++){
-            float y=501.9f-i*19.8f;
+            float y=512.1f-i*19.8f;
             label(c,lbl[i],366.7f,y);
             text(c,regular,money(s.path(keys[i]).asLong(),s.path("currency").asText()),
                  10.3f,509.5f,y,MUTED,94f);
@@ -115,7 +115,7 @@ public final class StatementPdfRenderer {
         label(c,"Transactions continued",15.3f,629.5f);
     }
     private void drawTable(PdfContentByte c,JsonNode txs,int from,int until,String currency)throws Exception {
-        final float headerY=421.0f, rowY=392.5f;
+        final float headerY=416.6f, rowY=392.8f;
         text(c,regular,"Date",10.3f,15.3f,headerY,MUTED,90);
         text(c,regular,"Description",10.3f,118.1f,headerY,MUTED,275);
         text(c,regular,"Amount",10.3f,409.8f,headerY,MUTED,90);
@@ -148,7 +148,7 @@ public final class StatementPdfRenderer {
         List<String> lines=wrap(FOOTER,regular,10.3f,585f);
         if(lines.size()>5)throw new IllegalStateException("Issuer disclosure exceeds allocated layout");
         for(int i=0;i<lines.size();i++)
-            text(c,regular,lines.get(i),10.3f,13.6f,319.0f-i*12.9f,MUTED,585f);
+            text(c,regular,lines.get(i),10.3f,13.6f,320.0f-i*12.9f,MUTED,585f);
     }
 
     private void pair(PdfContentByte c,String label,String value,float y,float max)throws Exception {
