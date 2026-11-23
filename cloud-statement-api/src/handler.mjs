@@ -66,7 +66,9 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
       statementAccountId!==null&&statementAccountId!==undefined&&statementAccountId!==''
       &&profileAccountId!==statementAccountId)
     throw new Error('Statement account ID does not match the authenticated customer profile');
-  return {accountReference,accountId:account.account_id??account.accountId??null};
+  const routingRaw=account.routing_number??account.routingNumber??null;
+  return {accountReference,accountId:account.account_id??account.accountId??null,
+    routingNumber:typeof routingRaw==='string'?routingRaw.trim():''};
 }
 async function renderWithOpenPdf(statement){
   const base=process.env.PDF_STAMPER_URL;
@@ -292,11 +294,20 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
             const verifiedAccountReference=profileBinding.accountReference;
             const payload=await nsave.getStatement(verifiedAccountReference,{start:from,end:to});
             statement=normalizeNsaveStatement(payload,{accountReference:verifiedAccountReference,from,to});
-            verifyNsaveCustomerAccountBinding(customerProfile,{
+            const checkedBinding=verifyNsaveCustomerAccountBinding(customerProfile,{
               customerId,accountReference:verifiedAccountReference,
               statementAccountReference:statement.accountReference,
               statementAccountId:statement.accountId
             });
+            // Only use the verified nSave statement/account profile as routing sources.
+            const statementRouting=statement.routingNumber||'';
+            const profileRouting=checkedBinding.routingNumber||'';
+            if(statementRouting&&profileRouting&&statementRouting!==profileRouting)
+              throw new Error('nSave routing number differs between statement and account profile');
+            const routingNumber=statementRouting||profileRouting;
+            if(!/^[0-9]{9}$/.test(routingNumber))
+              throw new Error('Verified nine-digit US routing number is unavailable for this account');
+            statement=Object.freeze({...statement,routingNumber});
             if(!statement.organizationReference)
               throw new Error('Missing nSave organization reference');
             if(process.env.NSAVE_ORGANIZATION_REFERENCE&&
