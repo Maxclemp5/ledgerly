@@ -67,7 +67,6 @@ public final class StatementPdfRenderer {
         writer.getInfo().put(PdfName.MODDATE,new PdfDate(issuedAt));
         document.addTitle("Account Statement "+s.path("currency").asText());
         document.addSubject("Account statement "+s.path("from").asText()+" to "+s.path("to").asText());
-        document.addCreator("LedgerDesk OpenPDF statement issuance engine");
         document.addAuthor("LedgerDesk authorized issuer statement service");
         writer.setPdfVersion(PdfWriter.PDF_VERSION_1_7);
         document.open();
