@@ -22,6 +22,22 @@ const verify=createNeonVerifier({
 });
 const pool=makePool(),store=new StatementRepository(pool);
 const nsave=createNsaveClient();
+/**
+ * One-off startup connectivity probe. The upstream response is deliberately
+ * discarded: do not log customer data, account numbers, or API secrets.
+ * Failure does not make the main dashboard unavailable.
+ */
+if(nsave.configured()){
+  void nsave.listCustomers({limit:1,offset:0}).then(
+    ()=>console.info('nSave API connection check: SUCCESS'),
+    error=>console.warn('nSave API connection check: FAILED ('+
+      (['NSAVE_AUTH_FAILED','UPSTREAM_RATE_LIMIT','NSAVE_API_ERROR'].includes(error?.code)
+        ? error.code : 'NETWORK_OR_RESPONSE_ERROR')+')')
+  );
+}else{
+  console.warn('nSave API connection check: NOT_CONFIGURED');
+}
+
 const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN,nsave});
 const port=Number(process.env.PORT||10000);
 const serveStatic=createStaticHandler({authBaseUrl:process.env.NEON_AUTH_BASE_URL});
