@@ -9,6 +9,7 @@ import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
 import com.lowagie.text.pdf.PdfDate;
 import com.lowagie.text.pdf.PdfName;
+import com.lowagie.text.pdf.PdfString;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
