@@ -1,35 +1,24 @@
-# LedgerDesk OpenPDF Stamper
+# LedgerDesk native OpenPDF statement renderer
 
-Isolated Java 21 + Maven service for stamping verified nSave statement data onto the issuer-provided PDF background.
+Java 21, Maven and OpenPDF 2.2.5 create **brand-new US Letter PDF documents** using `Document`, `PdfWriter` and `PdfContentByte`. Each dynamic field is drawn only once from the verified nSave ledger statement. No existing customer statement page, prior PDF metadata, original content stream, `PdfReader`, or `PdfStamper` enters the final document.
 
-## Required issuer template asset
+## Reference and static branding
 
-Place the exact approved nSave statement PDF at:
+`src/main/resources/template/nsave-statement-template.pdf` is used **at build time only** as the approved visual design reference. `scripts/extract_design_assets.py` obtains the static logo and seal artwork, and creates native embedded regular/semibold Inter fonts. The Java app receives isolated PNG artwork and fonts only; the reference statement is **not** bundled as a page or used as a PDF background.
 
-`src/main/resources/template/nsave-statement-template.pdf`
+**Security:** The historical reference contains customer information, so it must not remain in a public source repository for production. Move the approved static assets to an access-controlled source and purge historic exposure according to company policy before launch.
 
-Do not recreate the logo, seal, footer, or labels. The stamper uses this PDF as the original page background and masks only variable value regions.
+## HTTP integration
 
-## Runtime configuration
+- `GET /health` — availability
+- `POST /render` — strict bearer token and normalized verified statement JSON; response is new `application/pdf`.
+- `PDF_STAMPER_TOKEN` — legacy service environment variable; minimum 32 characters. Keep identical to the Node manager API.
+- Node sets `PDF_STAMPER_URL` to this service URL.
 
-- `PORT` — HTTP port (Render supplies this).
-- `PDF_STAMPER_TOKEN` — required shared bearer secret, minimum 32 characters.
+The Node manager API retains issuer authentication, manager authorization, profile `account_reference` binding, optional `account_id` match, period and ledger reconciliation, and append-only audit.
 
-## API
+## Verification
 
-- `GET /health` — returns service health and engine name.
-- `POST /render` — requires `Authorization: Bearer <PDF_STAMPER_TOKEN>`; accepts the normalized statement JSON from the Node manager API and returns `application/pdf`.
+Run the Maven tests and geometry regression script from the `java-pdf-stamper` directory after executing the asset extractor. GitHub Action `OpenPDF Java Stamper CI` performs this automatically on Java source changes. It also uploads a **test-data-only preview PDF** for review.
 
-The Node API is responsible for manager authorization, nSave retrieval, account ownership, period validation, ledger reconciliation, and audit logging. This service only renders the already-validated statement.
-
-## Rendering
-
-Uses OpenPDF 2.2.5's legacy-compatible `com.lowagie.text.pdf.PdfReader`, `PdfStamper`, and `PdfContentByte` APIs. Dynamic values are stamped with absolute coordinates and an embedded Inter font. The issuer background supplies all fixed branding and static labels.
-
-## Build
-
-```sh
-mvn -B clean test package
-```
-
-The Docker build fetches the Inter variable font from the Google Fonts repository and embeds it in the application JAR.
+The current design-reference regression checks US Letter page dimensions and text positions to within **1.25 PDF points** for selected fixed labels. Pixel-perfect equality across renderers and full transaction pagination have **not** been approved for production. Complete human visual QA, long-transaction overflow tests, authorized issuer branding/signatures, metadata policy, accessibility review, and jurisdictional compliance before real issuance.
