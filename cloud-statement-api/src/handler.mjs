@@ -264,13 +264,14 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           let statement;
           try{
             // Profile ownership is checked before the statement API is called.
-            verifyNsaveCustomerAccountBinding(customerProfile,{
+            const profileBinding=verifyNsaveCustomerAccountBinding(customerProfile,{
               customerId,accountReference,statementAccountReference:accountReference
             });
-            const payload=await nsave.getStatement(accountReference,{start:from,end:to});
-            statement=normalizeNsaveStatement(payload,{accountReference,from,to});
+            const verifiedAccountReference=profileBinding.accountReference;
+            const payload=await nsave.getStatement(verifiedAccountReference,{start:from,end:to});
+            statement=normalizeNsaveStatement(payload,{accountReference:verifiedAccountReference,from,to});
             verifyNsaveCustomerAccountBinding(customerProfile,{
-              customerId,accountReference,
+              customerId,accountReference:verifiedAccountReference,
               statementAccountReference:statement.accountReference,
               statementAccountId:statement.accountId
             });
