@@ -2,19 +2,21 @@
 // Do not invent missing addresses or linked bank accounts.
 export function nsaveObject(x){return x&&typeof x==='object'&&!Array.isArray(x)?x:{}}
 const firstObject=(...items)=>items.find(x=>x&&typeof x==='object'&&!Array.isArray(x))||{};
-export function nsaveCustomer(raw){
+export function nsaveCustomer(raw,summary={}){
  const outer=nsaveObject(raw), data=nsaveObject(outer.data);
  const detail=firstObject(data.customer,data.profile,outer.customer,outer.profile,
    data.data?.customer,data.data?.profile,data.data,outer.data,outer);
  const nested=firstObject(detail.customer,detail.profile,detail.personal_details,detail.personalDetails);
  // Search/list summaries may contain the customer reference while the detail fields are nested.
- const profile={...outer,...data,...detail,...nested};
- const addresses=[nested.address,detail.address,data.address,outer.address,
+ const profile={...nsaveObject(summary),...outer,...data,...detail,...nested};
+ // Detail payloads can be narrower than search summaries: preserve summary values.
+ for(const [key,val] of Object.entries(nsaveObject(summary)))if(profile[key]==null||profile[key]==='')profile[key]=val;
+ const addresses=[nested.address,detail.address,data.address,outer.address,summary.address,
   nested.residential_address,detail.residential_address,detail.contact?.address,
   detail.personal_details?.address,detail.profile?.address];
  profile.address=addresses.find(x=>x&&(typeof x==='string'||typeof x==='object'))||null;
  const sources=[nested,detail,data,outer,nested.banking,detail.banking,data.banking,outer.banking,
-  detail.customer,data.customer,outer.customer].map(nsaveObject);
+  detail.customer,data.customer,outer.customer,summary].map(nsaveObject);
  let found=false;
  for(const src of sources){
   for(const key of ['accounts','bank_accounts','bankAccounts','linked_accounts','linkedAccounts']){
@@ -25,7 +27,21 @@ export function nsaveCustomer(raw){
   }
   if(found)break;
  }
- if(!found)profile.accounts=[];
+ if(!found){
+  // Ledger managers sometimes expose a single bank account as flat customer fields.
+  // Only materialize that account when an account identifier/reference is present.
+  const flat=[nested,detail,data,outer,summary].map(nsaveObject)
+    .reduce((out,src)=>({...out,...src}),{});
+  const accountId=flat.account_id||flat.accountId||flat.account_reference||flat.accountReference;
+  profile.accounts=accountId?[{
+   id:String(accountId),account_reference:flat.account_reference||flat.accountReference,
+   account_number:flat.account_number||flat.accountNumber,
+   bank_name:flat.bank_name||flat.bankName,
+   bank_address:flat.bank_address||flat.bankAddress,
+   currency:flat.currency,status:flat.account_status||flat.accountStatus
+  }]:[];
+ }
+ profile.bank_address=profile.bank_address||profile.bankAddress||summary.bank_address||summary.bankAddress||null;
  return profile;
 }
 export function nsaveAddressText(raw){
