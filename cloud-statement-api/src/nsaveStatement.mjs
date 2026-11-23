@@ -62,7 +62,7 @@ export function normalizeNsaveStatement(payload,{accountReference,customerRefere
   organizationReference:typeof root.organization_reference==='string'?root.organization_reference:'',
   customerReference:text(row.nsave_reference,'nsave_reference',160),
   accountReference:text(row.account_reference,'account_reference',160),
-  accountId:text(row.account_id,'account_id',160),
+  accountId:typeof row.account_id==='string'&&row.account_id.trim()?row.account_id.trim():null,
   customerName:text(row.customer_name,'customer_name',160),
   address:text(row.address,'address',500),
   bankName:text(row.bank_name,'bank_name',120),
