@@ -4,6 +4,7 @@ import {createNeonVerifier} from './neonAuth.mjs';
 import {makePool,StatementRepository} from './repository.mjs';
 import {createStaticHandler} from './staticServer.mjs';
 import {createAuthProxy} from './authProxy.mjs';
+import {createNsaveClient} from './nsaveClient.mjs';
 
 for (const env of ['ALLOWED_WEB_ORIGIN','NEON_AUTH_BASE_URL','NEON_AUTH_JWKS_URL']) {
   if (!process.env[env]) throw new Error('Missing required configuration: '+env);
@@ -20,7 +21,8 @@ const verify=createNeonVerifier({
   jwksUrl:process.env.NEON_AUTH_JWKS_URL
 });
 const pool=makePool(),store=new StatementRepository(pool);
-const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN});
+const nsave=createNsaveClient();
+const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN,nsave});
 const port=Number(process.env.PORT||10000);
 const serveStatic=createStaticHandler({authBaseUrl:process.env.NEON_AUTH_BASE_URL});
 const serveAuth=createAuthProxy(process.env.NEON_AUTH_BASE_URL);
