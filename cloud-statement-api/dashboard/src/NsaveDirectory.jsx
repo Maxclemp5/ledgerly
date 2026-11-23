@@ -91,7 +91,7 @@ function Profile({profile,onBack,api}){
         ['Closing balance',result.summary.closing_balance??result.summary.closingBalance],
         ['Total deposits',result.summary.total_deposits??result.summary.totalDeposits],
         ['Total payments',result.summary.total_payments??result.summary.totalPayments],
-        ['Currency',result.summary.currency||result.raw?.currency]
+        ['Currency',result.summary.currency]
        ].filter(([,v])=>v!==undefined&&v!==null).map(([label,v])=>
         <Field key={label} label={label}>{value(v)}</Field>)}
       </div>:
