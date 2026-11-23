@@ -1,23 +1,15 @@
+import {nsaveCustomer,nsaveAddressText,nsaveUnpack} from './nsaveProfile.mjs';
 import React,{useState} from 'react';
 import {Search,RefreshCw,ChevronRight,ArrowLeft,FileText,ShieldCheck} from 'lucide-react';
 
 // Search and profile retrieval are performed on the server with organization credentials.
 // Never store the returned banking profile in browser storage or logs.
-function unpack(payload){
- const obj=payload?.data&&typeof payload.data==='object'?payload.data:payload;
- if(Array.isArray(obj))return {items:obj,next:null};
- const items=[obj?.customers,obj?.matches,obj?.results,obj?.items].find(Array.isArray);
- if(items)return {items,next:obj.next_offset??null};
- if(obj?.customer)return {items:[obj.customer],next:null};
- return {items:obj&&typeof obj==='object'&&('id' in obj||'customer_id' in obj)?[obj]:[],next:obj?.next_offset??null};
-}
 const customerId=x=>String(x?.id||x?.customer_id||x?.customerId||x?.nsave_reference||'');
 const customerName=x=>String(x?.full_name||x?.fullName||x?.name||
  [x?.first_name,x?.last_name].filter(Boolean).join(' ')||'Name not supplied');
 const mask=n=>{const s=String(n||'');return s.length<=4?'••••':'•••• '+s.slice(-4)};
 const value=x=>x===undefined||x===null||x===''?'—':String(x);
-const accountsOf=p=>Array.isArray(p?.accounts)?p.accounts:
- Array.isArray(p?.bank_accounts)?p.bank_accounts:Array.isArray(p?.bankAccounts)?p.bankAccounts:[];
+const accountsOf=p=>Array.isArray(p?.accounts)?p.accounts:[];
 function Field({label,children}){return <div className="nsave-field"><small>{label}</small><strong>{children}</strong></div>}
 function Profile({profile,onBack,api}){
  const [selected,setSelected]=useState('');
@@ -25,7 +17,7 @@ function Profile({profile,onBack,api}){
  const [error,setError]=useState(''),[result,setResult]=useState('');
  const accounts=accountsOf(profile);
  const id=customerId(profile);
- const address=profile.address&&typeof profile.address==='object'?profile.address:{};
+ const address=profile.address;
  const reference=profile.nsave_reference||profile.nsaveReference||id;
  async function prepare(e){
   e.preventDefault();setError('');setResult('');
@@ -50,18 +42,18 @@ function Profile({profile,onBack,api}){
    <Field label="Phone">{value(profile.phone||profile.phone_number)}</Field>
    <Field label="Created">{value(profile.created_at||profile.createdAt)}</Field>
    <Field label="KYC">{value(profile.kyc_status||profile.kycStatus)}</Field>
-   <Field label="Address">{value([address.line1,address.line2,address.city,address.region,address.postal_code,address.country].filter(Boolean).join(', '))}</Field>
+   <Field label="Address">{value(nsaveAddressText(address))}</Field>
   </div>
   <h3>Linked nSave bank accounts</h3>
-  {!accounts.length?<p>nSave returned no linked accounts for this customer.</p>:
+  {!accounts.length?<p>Linked bank-account details are not included in the nSave profile response. The customer record loaded, but no account list was supplied by this endpoint.</p>:
    <div className="old-overflow"><table><thead><tr><th>Select</th><th>Account</th><th>Bank</th><th>Currency</th><th>Status</th></tr></thead>
     <tbody>{accounts.map((a,i)=>{
      const aid=String(a.id||a.account_id||a.accountId||'');
      return <tr key={aid||i}>
-      <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||aid)}
+      <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||a.accountNumber||a.iban||aid)}
        checked={selected===aid&&!!aid} disabled={!aid} onChange={()=>{setSelected(aid);setError('');setResult('')}}/></td>
-      <td>{mask(a.account_number||a.accountNumber||a.masked_number||aid)}<small>{value(a.id||a.account_id)}</small></td>
-      <td>{value(a.bank_name||a.bankName)}</td><td>{value(a.currency)}</td><td>{value(a.status)}</td>
+      <td>{mask(a.account_number||a.accountNumber||a.masked_number||a.iban||aid)}<small>{value(a.id||a.account_id)}</small></td>
+      <td>{value(a.bank_name||a.bankName||a.bank?.name)}</td><td>{value(a.currency||a.currency_code)}</td><td>{value(a.status)}</td>
      </tr>;
     })}</tbody></table></div>}
   <div className="nsave-statement">
@@ -89,7 +81,7 @@ export default function NsaveDirectory({api}){
   setLoading(true);setError('');if(offset===0){setItems([]);setSelected(null)}
   try{
    const data=await api('/v1/manager/nsave/customers?limit=50&offset='+encodeURIComponent(String(offset)));
-   const parsed=unpack(data);
+   const parsed=nsaveUnpack(data);
    setItems(old=>offset===0?parsed.items:[...old,...parsed.items]);
    setNext(parsed.next);setSearched(true);
   }catch(e){setError(e.message||'Unable to load nSave customers')}finally{setLoading(false)}
@@ -111,8 +103,8 @@ export default function NsaveDirectory({api}){
   setBusyProfile(true);
   try{
    const data=await api('/v1/manager/nsave/customers/'+encodeURIComponent(id));
-   const profile=data?.customer||data?.data||data;
-   if(!profile||typeof profile!=='object')throw new Error('nSave returned an invalid customer profile.');
+   const profile=nsaveCustomer(data);
+   if(!customerId(profile))throw new Error('nSave returned an incomplete customer profile.');
    setSelected(profile);
   }catch(e){setError(e.message||'Customer profile could not be loaded')}finally{setBusyProfile(false)}
  }
