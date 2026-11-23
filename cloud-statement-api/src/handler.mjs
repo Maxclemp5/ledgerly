@@ -74,16 +74,40 @@ async function renderWithOpenPdf(statement){
   const base=process.env.PDF_STAMPER_URL;
   const token=process.env.PDF_STAMPER_TOKEN;
   if(!base||!token)throw new HttpError(503,'PDF_STAMPER_NOT_CONFIGURED','The approved OpenPDF rendering service is not configured.');
+  // Render Free instances may need to wake after inactivity. A 502 from the
+  // Render edge before our Java handler runs is retryable; invalid statement
+  // data, authorization errors, and all other application errors are not.
+  const payload=JSON.stringify(statement);
   let response;
-  try{
-    response=await fetch(new URL('/render',base),{
-      method:'POST',
-      headers:{'authorization':'Bearer '+token,'content-type':'application/json','accept':'application/pdf'},
-      body:JSON.stringify(statement),
-      signal:AbortSignal.timeout(90000)
-    });
-  }catch{
-    throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE','The OpenPDF rendering service is temporarily unavailable.');
+  let networkFailure=false;
+  const renderUrl=new URL('/render',base);
+  const deadline=Date.now()+110000;
+  for(let attempt=0;attempt<4;attempt++){
+    try {
+      const remaining=deadline-Date.now();
+      if(remaining<=0)break;
+      response=await fetch(renderUrl,{
+        method:'POST',
+        headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/pdf'},
+        body:payload,
+        signal:AbortSignal.timeout(Math.min(remaining,35000))
+      });
+      networkFailure=false;
+    } catch {
+      response=undefined;
+      networkFailure=true;
+    }
+    if(response&&!([502,503,504].includes(response.status)))break;
+    if(attempt===3||deadline-Date.now()<3000)break;
+    console.warn('OpenPDF upstream transient failure',response?.status??'network','retry',attempt+1);
+    // Consume any failed response so pooled connections can be reused.
+    if(response)await response.arrayBuffer().catch(()=>{});
+    await new Promise(resolve=>setTimeout(resolve,Math.min(3000+attempt*4000,deadline-Date.now()-1000)));
+  }
+  if(!response){
+    throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE',
+      networkFailure?'The OpenPDF service could not be reached after retrying.':
+        'The OpenPDF rendering service is temporarily unavailable.');
   }
   if(!response.ok){
     // Do not log, forward or expose the verified customer's statement payload,
