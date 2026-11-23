@@ -15,7 +15,7 @@ function Profile({profile,onBack,api}){
  const [selected,setSelected]=useState('');
  const [revealAccounts,setRevealAccounts]=useState(false);
  const [from,setFrom]=useState(''),[to,setTo]=useState('');
- const [error,setError]=useState(''),[result,setResult]=useState('');
+ const [error,setError]=useState(''),[result,setResult]=useState(null),[checking,setChecking]=useState(false);
  const accounts=accountsOf(profile);
  const id=customerId(profile);
  const address=profile.address;
@@ -24,12 +24,15 @@ function Profile({profile,onBack,api}){
   e.preventDefault();setError('');setResult('');
   if(!selected){setError('Select one of this customer’s accounts.');return}
   if(!from||!to||from>to){setError('Select a valid statement date range.');return}
+  setChecking(true);
   try{
-   await api('/v1/manager/nsave/statement-readiness',{method:'POST',body:{
+   const pulled=await api('/v1/manager/nsave/statement-readiness',{method:'POST',body:{
     customerId:id,accountId:selected,from,to
    }});
-   setResult('Statement source verified. Continue with the authorized issuer statement workflow.');
-  }catch(err){setError(err.message||'Official statement generation is not available yet.')}
+   const raw=pulled?.profile?.data||pulled?.profile||{};
+   const summary=raw?.account_summary||raw?.accountSummary||raw?.ledger_summary||raw?.ledgerSummary||raw?.summary||raw?.data?.account_summary||{};
+   setResult({summary,from,to,note:pulled?.note||'nSave period data retrieved.'});
+  }catch(err){setError(err.message||'Unable to retrieve nSave date-scoped summary.')}finally{setChecking(false)}
  }
  return <div className="old-card">
   <button type="button" className="old-secondary" onClick={onBack}><ArrowLeft size={15}/> Back to customers</button>
@@ -74,10 +77,26 @@ function Profile({profile,onBack,api}){
      <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)} required/></label>
      <label>To<input type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)} required/></label>
     </div>
-    <button type="submit" className="old-primary" disabled={!selected}>Check statement readiness <ChevronRight size={15}/></button>
+    <button type="submit" className="old-primary" disabled={!selected||checking}>{checking?'Loading period data…':'Fetch account summary'} <ChevronRight size={15}/></button>
    </form>
    {error&&<div className="old-alert error" role="alert">{error}</div>}
-   {result&&<div className="old-alert ok" role="status">{result}</div>}
+   {result&&<div className="old-card" role="status">
+    <h3>nSave period summary · {result.from} to {result.to}</h3>
+    <p>{result.note}</p>
+    {Object.keys(result.summary).length>0?
+      <div className="nsave-fields">
+       {[
+        ['Opening balance',result.summary.opening_balance??result.summary.openingBalance],
+        ['Closing balance',result.summary.closing_balance??result.summary.closingBalance],
+        ['Total deposits',result.summary.total_deposits??result.summary.totalDeposits],
+        ['Total payments',result.summary.total_payments??result.summary.totalPayments],
+        ['Currency',result.summary.currency]
+       ].filter(([,v])=>v!==undefined&&v!==null).map(([label,v])=>
+        <Field key={label} label={label}>{value(v)}</Field>)}
+      </div>:
+      <p>No recognized account-summary fields were returned for the selected period. The dated profile request succeeded, but the response needs additional ledger field mapping.</p>}
+    <p>No official statement has been issued by this preview.</p>
+   </div>}
    <p><ShieldCheck size={13}/> No transactions during a period is valid. Statement PDF delivery requires issuer-verified opening and closing balances and an authorized statement source.</p>
   </div>
  </div>;
