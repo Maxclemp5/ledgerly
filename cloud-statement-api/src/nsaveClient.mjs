@@ -60,7 +60,8 @@ export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={
       if(!criteria||typeof criteria!=='object'||Array.isArray(criteria))throw new Error('Search criteria required');
       const keys=Object.keys(criteria);
       if(keys.length!==1||!['account_number','name'].includes(keys[0])||
-        typeof criteria[keys[0]]!=='string'||!criteria[keys[0]].trim()||criteria[keys[0]].length>160||\n        (keys[0]==='account_number'&&!/^[0-9]+$/.test(criteria[keys[0]])))
+        typeof criteria[keys[0]]!=='string'||!criteria[keys[0]].trim()||criteria[keys[0]].length>160||
+        (keys[0]==='account_number'&&!/^[0-9]+$/.test(criteria[keys[0]])))
         throw new Error('Search by exact account number or full customer name');
       return this.call('customers/search',{method:'POST',body:criteria});
     }
