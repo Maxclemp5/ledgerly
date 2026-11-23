@@ -29,7 +29,7 @@ class StatementPdfRendererTest {
             assertEquals(612f,reader.getPageSize(1).getWidth(),.1f);
             assertEquals(792f,reader.getPageSize(1).getHeight(),.1f);
             assertTrue(reader.getInfo().getOrDefault("Creator", "").isBlank(), "Creator must be unset");
-            assertTrue(reader.getInfo().getOrDefault("Author", "").isBlank(), "Author must be unset");
+            assertEquals("None", reader.getInfo().get("Author"), "Author metadata must default to literal None");
             assertFalse(reader.getInfo().getOrDefault("Producer", "").contains("Quartz PDFContext"));
             String created=reader.getInfo().get("CreationDate");
             String modified=reader.getInfo().get("ModDate");
