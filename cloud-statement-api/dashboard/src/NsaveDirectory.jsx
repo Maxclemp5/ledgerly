@@ -15,13 +15,26 @@ function Profile({profile,onBack,api}){
  const [selected,setSelected]=useState('');
  const [revealAccounts,setRevealAccounts]=useState(false);
  const [from,setFrom]=useState(''),[to,setTo]=useState('');
- const [error,setError]=useState(''),[result,setResult]=useState(null),[checking,setChecking]=useState(false);
+ const [error,setError]=useState(''),[result,setResult]=useState(null),[checking,setChecking]=useState(false),[generating,setGenerating]=useState(false);
  const accounts=accountsOf(profile);
  const id=customerId(profile);
  const address=profile.address;
  const reference=profile.nsave_reference||profile.nsaveReference||id;
+ async function generatePdf(){
+  setError('');setGenerating(true);
+  try{
+   const customerReference=profile.nsave_reference||profile.nsaveReference||profile.reference;
+   if(!customerReference)throw new Error('The selected customer has no nSave customer reference.');
+   const pdf=await api('/v1/manager/nsave/statements/generate',{method:'POST',responseType:'blob',body:{
+    customerId:id,customerReference,accountReference:selected,from,to
+   }});
+   const url=URL.createObjectURL(pdf);
+   const a=document.createElement('a');a.href=url;a.download='nsave-statement-'+from+'-to-'+to+'.pdf';
+   document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }catch(err){setError(err.message||'Statement PDF could not be generated.')}finally{setGenerating(false)}
+ }
  async function prepare(e){
-  e.preventDefault();setError('');setResult('');
+  e.preventDefault();setError('');setResult(null);
   if(!selected){setError('Select one of this customer’s accounts.');return}
   if(!from||!to||from>to){setError('Select a valid statement date range.');return}
   setChecking(true);
@@ -29,10 +42,19 @@ function Profile({profile,onBack,api}){
    const pulled=await api('/v1/manager/nsave/statement-readiness',{method:'POST',body:{
     customerId:id,accountId:selected,from,to
    }});
-   const raw=pulled?.statement?.data||pulled?.statement||{};
-   const summary=raw?.account_summary||raw?.accountSummary||raw?.ledger_summary||raw?.ledgerSummary||raw?.summary||raw?.data?.account_summary||raw?.statement_summary||{};
-   const transactions=raw?.transactions||raw?.items||raw?.entries||raw?.data?.transactions||[];
-   setResult({summary,transactions:Array.isArray(transactions)?transactions:[],fields:Object.keys(raw||{}),schema:pulled?.statementSchema||null,from,to,note:pulled?.note||'nSave statement data retrieved.'});
+   const raw=pulled?.statement||{};
+   const records=Array.isArray(raw?.data)?raw.data:[];
+   const record=records.find(x=>(x?.account_reference||'')===selected)||null;
+   if(!record)throw new Error('nSave returned no matching account record for this statement period.');
+   const summary={
+    opening_cents:record.opening_cents,
+    closing_cents:record.closing_cents,
+    total_deposits_cents:record.total_deposits_cents,
+    total_payments_cents:record.total_payments_cents,
+    currency:record.currency
+   };
+   const transactions=Array.isArray(record.transactions)?record.transactions:[];
+   setResult({summary,record,transactions,fields:Object.keys(raw||{}),schema:pulled?.statementSchema||null,from,to,note:pulled?.note||'nSave statement data retrieved.'});
   }catch(err){setError(err.message||'Unable to retrieve nSave date-scoped summary.')}finally{setChecking(false)}
  }
  return <div className="old-card">
@@ -87,16 +109,19 @@ function Profile({profile,onBack,api}){
     {Object.keys(result.summary).length>0?
       <div className="nsave-fields">
        {[
-        ['Opening balance',result.summary.opening_balance??result.summary.openingBalance],
-        ['Closing balance',result.summary.closing_balance??result.summary.closingBalance],
-        ['Total deposits',result.summary.total_deposits??result.summary.totalDeposits],
-        ['Total payments',result.summary.total_payments??result.summary.totalPayments],
+        ['Opening balance',result.summary.opening_cents===undefined?undefined:(result.summary.opening_cents/100).toLocaleString('en-US',{style:'currency',currency:result.summary.currency||'USD'})],
+        ['Closing balance',result.summary.closing_cents===undefined?undefined:(result.summary.closing_cents/100).toLocaleString('en-US',{style:'currency',currency:result.summary.currency||'USD'})],
+        ['Total deposits',result.summary.total_deposits_cents===undefined?undefined:(result.summary.total_deposits_cents/100).toLocaleString('en-US',{style:'currency',currency:result.summary.currency||'USD'})],
+        ['Total payments',result.summary.total_payments_cents===undefined?undefined:(result.summary.total_payments_cents/100).toLocaleString('en-US',{style:'currency',currency:result.summary.currency||'USD'})],
         ['Currency',result.summary.currency]
        ].filter(([,v])=>v!==undefined&&v!==null).map(([label,v])=>
         <Field key={label} label={label}>{value(v)}</Field>)}
       </div>:
       <p>The statement endpoint responded, but its account-summary fields are not mapped yet. The privacy-safe response structure is shown below; it contains field names and data types only, not customer values.</p>}
-    <p>Detected transaction records: {result.transactions.length}. This count is provisional until the transaction-array path is confirmed from the response structure.\n    {result.schema&&<details className="nsave-schema"><summary>View sanitized response structure</summary><pre>{JSON.stringify(result.schema,null,2)}</pre></details>}\n    <p>Statement PDF issuance remains disabled until the returned fields are mapped and reconciled against the supplied template.</p></p>
+    <p>{result.transactions.length===0?'No transactions in this period.':'nSave returned '+result.transactions.length+' transaction records for this period.'}</p>
+    {result.record&&<p>Account reference verified: {value(result.record.account_reference)} · Request reference: {value(result.record.request_reference||result.schema?.fields?.request_reference?.type==='string'?'Available':'Returned by nSave')}</p>}
+    <button type="button" className="old-primary" disabled={generating||checking} onClick={generatePdf}>{generating?'Generating PDF…':'Generate and download statement PDF'} <FileText size={15}/></button>
+    {result.schema&&<details className="nsave-schema"><summary>View sanitized response structure</summary><pre>{JSON.stringify(result.schema,null,2)}</pre></details>}
    </div>}
    <p><ShieldCheck size={13}/> No transactions during a period is valid. Statement PDF delivery requires issuer-verified opening and closing balances and an authorized statement source.</p>
   </div>
