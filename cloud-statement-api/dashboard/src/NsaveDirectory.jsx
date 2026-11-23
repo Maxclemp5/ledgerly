@@ -104,7 +104,7 @@ export default function NsaveDirectory({api}){
   setLoading(true);
   try{
    const data=await api('/v1/manager/nsave/customers/search',{method:'POST',body:{[mode]:q}});
-   const parsed=unpack(data);setItems(parsed.items);setSearched(true);
+   const parsed=nsaveUnpack(data);setItems(parsed.items);setSearched(true);
   }catch(err){setError(err.message||'Customer search failed')}finally{setLoading(false)}
  }
  async function select(item){
