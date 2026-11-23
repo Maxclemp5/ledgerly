@@ -243,6 +243,25 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       const url=new URL(req.url||'/','http://localhost');
       if(req.method==='GET'&&url.pathname==='/health')
         return send(res,200,{ok:true,service:'ledgerdesk-statement-api'},origin);
+      if(req.method==='GET'&&url.pathname==='/health/openpdf'){
+        // Operational probe: no auth token, statement fields, or upstream URL exposed.
+        let upstream='network_error';
+        const base=process.env.PDF_STAMPER_URL;
+        if(!base)return send(res,503,{ok:false,upstream:'not_configured'},origin);
+        try{
+          const target=new URL('/health',base);
+          const response=await fetch(target,{signal:AbortSignal.timeout(12000)});
+          upstream=String(response.status);
+          if(response.ok){
+            const data=await response.json().catch(()=>null);
+            if(data?.status==='ok')return send(res,200,{ok:true,upstream:'healthy'},origin);
+            upstream='invalid_response';
+          }
+        }catch{}
+        logger.warn('OpenPDF operational health probe failed',upstream);
+        return send(res,503,{ok:false,upstream},origin);
+      }
+
       if(req.method==='OPTIONS') {
         if(!origin)throw new HttpError(403,'ORIGIN_BLOCKED','Origin not allowed');
         res.writeHead(204,{
