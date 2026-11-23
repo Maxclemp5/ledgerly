@@ -62,6 +62,7 @@ public final class StatementPdfRenderer {
         // One genuine issuance event: both dates refer to the same real instant.
         // Never inherit or backdate either timestamp from the design reference.
         Calendar issuedAt=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        writer.getInfo().put(PdfName.AUTHOR,new PdfString("None"));
         PdfDate timestamp=new PdfDate(issuedAt);
         writer.getInfo().put(PdfName.CREATIONDATE,timestamp);
         writer.getInfo().put(PdfName.MODDATE,new PdfDate(issuedAt));
