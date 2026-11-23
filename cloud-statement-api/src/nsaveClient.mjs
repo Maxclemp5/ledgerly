@@ -38,8 +38,16 @@ export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={
         method,headers, ...(body===undefined?{}:{body:JSON.stringify(body)}),
         signal:AbortSignal.timeout(12_000),cache:'no-store',redirect:'error'
       });
-      if(response.status===401||response.status===403)
-        throw Object.assign(new Error('nSave rejected the configured API credentials'),{code:'NSAVE_AUTH_FAILED',status:502,upstreamStatus:response.status});
+      if(response.status===401||response.status===403){
+        // Only classify the exact, documented service-token response.
+        // Never expose raw upstream payloads, credentials, or customer data.
+        const payload=await response.json().catch(()=>null);
+        const serviceTokenRejected=payload?.error==='Service authorization required.';
+        throw Object.assign(new Error('nSave rejected the configured API credentials'),{
+          code:serviceTokenRejected?'NSAVE_SERVICE_TOKEN_REJECTED':'NSAVE_AUTH_FAILED',
+          status:502,upstreamStatus:response.status
+        });
+      }
       if(response.status===429)
         throw Object.assign(new Error('nSave API rate limit reached'),{code:'UPSTREAM_RATE_LIMIT',status:429});
       if(!response.ok)
