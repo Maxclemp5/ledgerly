@@ -10,8 +10,11 @@ import LegacyAdmin,{ManagerPasswordForm} from './LegacyAdmin.jsx';
 import './style.css';
 
 function Brand(){
-  return <div className="brand"><span className="brand-symbol"><span className="brand-glyph">LD</span></span>
-    <span className="brand-wordmark"><strong>LEDGER</strong><span>DESK</span></span></div>;
+  return <div className="brand" aria-label="nsave LedgerDesk manager portal">
+    <span className="brand-nsave">nsave</span>
+    <span className="brand-divider" aria-hidden="true"/>
+    <span className="brand-product">LedgerDesk<small>Manager portal</small></span>
+  </div>;
 }
 function Notice({message,success=false,onClose}){
   if(!message)return null;
@@ -115,8 +118,8 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
     <aside className="auth-illustration">
       <div className="auth-top"><Brand/><span className="auth-pill"><span className="live-light"/> ORGANIZATION PORTAL</span></div>
       <div className="auth-pitch">
-        <span className="eyebrow bright">LEDGER DESK / ORGANIZATIONS</span>
-        <h1>One secure place.<br/><em>For your team.</em></h1>
+        <span className="eyebrow bright">NSAVE / ORGANIZATION ACCESS</span>
+        <h1>Banking operations,<br/><em>made simple.</em></h1>
         <p>Manage your authorized organization, internal customers and review workflows in one manager-only workspace.</p>
         <div className="auth-feature"><span><ShieldCheck size={19}/></span>
           <div><strong>Organization-level permissions</strong><small>Every manager action is scoped to administrator-approved issuer organizations.</small></div>
@@ -125,7 +128,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
           <div><strong>Manager accounts only</strong><small>No public registration or customer login. Customer identities belong to a separate Ledger API module.</small></div>
         </div>
       </div>
-      <div className="auth-footer">LEDGER DESK <span>•</span> MANAGER PORTAL <span>•</span> NSAVE ORGANIZATION</div>
+      <div className="auth-footer">NSAVE <span>•</span> LEDGERDESK <span>•</span> ORGANIZATION PORTAL</div>
     </aside>
     <main className="auth-panel"><div className="auth-panel-inner">
       <div className="auth-mobile-brand"><Brand/></div>
@@ -161,7 +164,7 @@ function ManagerLogin({client,authBaseUrl,onSignIn}){
             <button className="text-link" type="button" onClick={()=>navigate('verify-request')}>Verify manager email</button>
           </>:<button className="text-link" type="button" onClick={()=>navigate('login')}>Back to manager sign in</button>}
         </div>
-        <p className="auth-disclaimer"><LockKeyhole size={13}/> nSave organizational access. Ledger API connection will be enabled after approved credentials and documentation are supplied.</p>
+        <p className="auth-disclaimer"><LockKeyhole size={13}/> Secure nsave manager access. Customer information is retrieved through approved organization APIs.</p>
       </div>
     </div></main>
   </div>;
@@ -210,7 +213,7 @@ function ManagerWorkspace({client,session,onSignOut}){
       </nav>
       <div className="sidebar-bottom"><div className="security-panel"><span><ShieldCheck size={20}/></span>
         <strong>Restricted access</strong><small>Organization grants are checked by the server, not by browser settings.</small>
-      </div><span className="sidebar-caption">LEDGER DESK · MANAGER MODULE</span></div>
+      </div><span className="sidebar-caption">NSAVE · LEDGERDESK</span></div>
     </aside>
     <div className="main-shell">
       <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={()=>setMobile(!mobile)}><Menu size={21}/></button>
@@ -233,7 +236,7 @@ function ManagerWorkspace({client,session,onSignOut}){
             <button className="primary-button" onClick={onSignOut}>Return to sign in <ArrowRight size={16}/></button>
           </section>:
           <LegacyAdmin api={api} authClient={client} session={session} organizations={access.organizations||[]}/>}
-        <footer className="page-footer"><span>Ledger Desk · Organization-level module</span>
+        <footer className="page-footer"><span>nsave · LedgerDesk Organization Portal</span>
           <span><LockKeyhole size={13}/> Customer authentication belongs to your separate Ledger API</span></footer>
       </main>
     </div>
