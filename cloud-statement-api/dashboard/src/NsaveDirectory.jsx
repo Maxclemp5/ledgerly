@@ -15,13 +15,13 @@ function Profile({profile,onBack,api}){
  const [selected,setSelected]=useState('');
  const [revealAccounts,setRevealAccounts]=useState(false);
  const [from,setFrom]=useState(''),[to,setTo]=useState('');
- const [error,setError]=useState(''),[result,setResult]=useState(null),[checking,setChecking]=useState(false),[generating,setGenerating]=useState(false);
+ const [error,setError]=useState(''),[diagnostics,setDiagnostics]=useState(null),[result,setResult]=useState(null),[checking,setChecking]=useState(false),[generating,setGenerating]=useState(false);
  const accounts=accountsOf(profile);
  const id=customerId(profile);
  const address=profile.address;
  const reference=profile.nsave_reference||profile.nsaveReference||id;
  async function generatePdf(){
-  setError('');setGenerating(true);
+  setError('');setDiagnostics(null);setGenerating(true);
   try{
    const pdf=await api('/v1/manager/nsave/statements/generate',{method:'POST',responseType:'blob',body:{
     customerId:id,accountReference:selected,from,to
@@ -29,10 +29,10 @@ function Profile({profile,onBack,api}){
    const url=URL.createObjectURL(pdf);
    const a=document.createElement('a');a.href=url;a.download='nsave-statement-'+from+'-to-'+to+'.pdf';
    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-  }catch(err){setError(err.message||'Statement PDF could not be generated.')}finally{setGenerating(false)}
+  }catch(err){setError(err.message||'Statement PDF could not be generated.');setDiagnostics(err.diagnostics||null)}finally{setGenerating(false)}
  }
  async function prepare(e){
-  e.preventDefault();setError('');setResult(null);
+  e.preventDefault();setError('');setDiagnostics(null);setResult(null);
   if(!selected){setError('Select one of this customer’s accounts.');return}
   if(!from||!to||from>to){setError('Select a valid statement date range.');return}
   setChecking(true);
@@ -101,6 +101,14 @@ function Profile({profile,onBack,api}){
     <button type="submit" className="old-primary" disabled={!selected||checking}>{checking?'Loading period data…':'Fetch statement data'} <ChevronRight size={15}/></button>
    </form>
    {error&&<div className="old-alert error" role="alert">{error}</div>}
+   {diagnostics&&<div className="old-card" role="status">
+     <h3>nSave identity comparison — privacy-safe</h3>
+     <p>The selected account is linked to the customer, but one of the nSave owner references is inconsistent. No identifiers, names, account numbers or balances are shown here. The statement is not issued.</p>
+     <div className="nsave-fields">
+       {Object.entries(diagnostics).map(([key,val])=><Field key={key} label={key.replace(/([A-Z])/g,' $1')}>{val===null?'Not supplied':val?'Yes':'No'}</Field>)}
+     </div>
+     <p>Ask nSave Management to reconcile the customer-to-statement reference mapping at the source. Reattempt only after the upstream records agree.</p>
+   </div>}
    {result&&<div className="old-card" role="status">
     <h3>nSave period summary · {result.from} to {result.to}</h3>
     <p>{result.note}</p>
