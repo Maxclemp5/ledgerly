@@ -112,3 +112,7 @@
 .nsave-statement p{font-size:12px;color:#777}
 @media(max-width:1200px){.old-layout{grid-template-columns:185px 1fr}}
 @media(max-width:760px){.old-layout{display:block}.old-main{padding:22px 17px}.old-nav{padding:12px}.old-intro{flex-wrap:wrap}}
+
+.nsave-schema{margin:14px 0;border:1px solid #e7e7e7;border-radius:10px;padding:12px;background:#fff}
+.nsave-schema summary{cursor:pointer;font-size:12px;font-weight:700;color:#333}
+.nsave-schema pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;color:#555;margin:12px 0 0}
