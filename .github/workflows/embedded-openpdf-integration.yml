@@ -19,8 +19,8 @@ jobs:
         run: |
           docker run -d --name ledgerdesk-unified-test --publish 127.0.0.1:18080:10000 \
             -e 'ALLOWED_WEB_ORIGIN=https://example.test' \
-            -e 'NEON_AUTH_BASE_URL=https://example.test/auth' \
-            -e 'NEON_AUTH_JWKS_URL=https://example.test/auth/jwks' \
+            -e 'NEON_AUTH_BASE_URL=https://ci-auth.neon.tech/auth' \
+            -e 'NEON_AUTH_JWKS_URL=https://ci-auth.neon.tech/auth/jwks' \
             -e 'DATABASE_URL=postgres://demo:demo@127.0.0.1:5432/demo' \
             -e 'PDF_STAMPER_TOKEN=0123456789abcdefghijklmnopqrstuvwxyz' \
             ledgerdesk-unified-test
