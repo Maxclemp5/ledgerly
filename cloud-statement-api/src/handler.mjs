@@ -132,6 +132,18 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
         const detail=/^\/v1\/manager\/nsave\/customers\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
         if(req.method==='GET'&&detail)
           return send(res,200,{data:await nsave.getCustomer(detail[1])},origin);
+        if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/statement-readiness'){
+          const data=await readJson(req);
+          const customerId=input(data,'customerId',160),accountId=input(data,'accountId',160);
+          validPeriod(data);
+          if(!/^[A-Za-z0-9_-]+$/.test(customerId)||!/^[A-Za-z0-9_-]+$/.test(accountId))
+            throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
+          // Customer lookups alone do not establish authoritative ledger transactions,
+          // opening/closing balance checkpoints, or issuer-approved statement PDFs.
+          // Do not issue a downloadable statement from customer metadata.
+          throw new HttpError(409,'ISSUER_LEDGER_NOT_CONNECTED',
+            'Official statement generation is unavailable: nSave ledger transactions, opening/closing balances and issuer-approved statement delivery are not yet connected.');
+        }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
           const criteria=await readJson(req);
           return send(res,200,{data:await nsave.searchCustomer(criteria)},origin);
