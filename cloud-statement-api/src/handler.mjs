@@ -84,12 +84,34 @@ async function renderWithOpenPdf(statement){
     throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE','The OpenPDF rendering service is temporarily unavailable.');
   }
   if(!response.ok){
+    // Do not log, forward or expose the verified customer's statement payload,
+    // bearer token, or upstream error body. Status alone is safe to report.
+    console.warn('OpenPDF service returned HTTP status', response.status);
     if(response.status===422){
       const issue=await response.json().catch(()=>({}));
-      throw new HttpError(422,'PDF_STAMPER_VALIDATION_FAILED',
-        typeof issue.error==='string'?issue.error:'The statement does not fit the approved PDF template.');
+      const permitted=new Set([
+        'CUSTOMER_NAME_OVERFLOW','CUSTOMER_ADDRESS_OVERFLOW',
+        'BANK_FIELD_OVERFLOW','TRANSACTION_DESCRIPTION_OVERFLOW',
+        'FINANCIAL_VALUE_OVERFLOW','RENDER_INPUT_INVALID'
+      ]);
+      const reason=permitted.has(issue.code)?issue.code:'RENDER_INPUT_INVALID';
+      throw new HttpError(422,'PDF_STAMPER_'+reason,
+        'The statement data does not fit the approved PDF layout ('+reason+').');
     }
-    throw new HttpError(503,'PDF_STAMPER_UNAVAILABLE','The OpenPDF rendering service could not complete the statement.');
+    if(response.status===401||response.status===403)
+      throw new HttpError(503,'PDF_STAMPER_AUTH_FAILURE',
+        'The OpenPDF service rejected the server authentication. Contact the administrator.');
+    if(response.status===404)
+      throw new HttpError(503,'PDF_STAMPER_ROUTE_NOT_FOUND',
+        'The OpenPDF rendering route could not be reached. Contact the administrator.');
+    if(response.status===429||response.status===502||response.status===503||response.status===504)
+      throw new HttpError(503,'PDF_STAMPER_UPSTREAM_UNAVAILABLE',
+        'The OpenPDF rendering server is temporarily unavailable (HTTP '+response.status+').');
+    if(response.status>=500)
+      throw new HttpError(503,'PDF_STAMPER_INTERNAL_FAILURE',
+        'The OpenPDF renderer encountered an internal error (HTTP '+response.status+').');
+    throw new HttpError(502,'PDF_STAMPER_UNEXPECTED_STATUS',
+      'The OpenPDF renderer returned an unexpected HTTP status ('+response.status+').');
   }
   const type=response.headers.get('content-type')||'';
   if(!type.toLowerCase().includes('application/pdf'))
