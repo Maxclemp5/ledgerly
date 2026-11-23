@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 
-const isDate=(v)=>typeof v==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(v)&&
+const isDate=(v)=>typeof v==='string'&&/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v)&&
  Number.isFinite(Date.parse(v+'T00:00:00Z'))&&new Date(Date.parse(v+'T00:00:00Z')).toISOString().slice(0,10)===v;
 const cents=(v,label,{negative=false}={})=>{
  if(!Number.isSafeInteger(v)||(!negative&&v<0))throw new Error('Invalid verified statement field: '+label);
