@@ -1,3 +1,4 @@
+import {normalizeNsaveStatement,renderNsaveStatement} from './nsaveStatement.mjs';
 import {URL} from 'node:url';
 
 export class HttpError extends Error {
@@ -19,6 +20,19 @@ function safeShape(value,depth=0){
       [key,safeShape(v,depth+1)])),truncated:Object.keys(value).length>80};
   }
   return {type:typeof value};
+}
+function sendPdf(res,buffer,filename,origin=''){
+  res.writeHead(200,{
+    'content-type':'application/pdf',
+    'content-length':String(buffer.length),
+    'content-disposition':'attachment; filename="'+filename+'"',
+    'cache-control':'no-store, private',
+    'x-content-type-options':'nosniff',
+    'referrer-policy':'no-referrer',
+    'vary':'Origin',
+    ...(origin?{'access-control-allow-origin':origin}:{})
+  });
+  res.end(buffer);
 }
 function send(res,status,data,origin='') {
   res.writeHead(status,{
@@ -154,6 +168,40 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           if(start!==null)validPeriod({from:start,to:end});
           return send(res,200,{data:await nsave.getCustomer(detail[1],
             start===null?{}:{start,end})},origin);
+        }
+        if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/statements/generate'){
+          const data=await readJson(req);
+          const customerId=input(data,'customerId',160);
+          const customerReference=input(data,'customerReference',160);
+          const accountReference=input(data,'accountReference',160);
+          const {from,to}=validPeriod(data);
+          if(!/^[A-Za-z0-9_-]+$/.test(customerId)||!/^nsave_[A-Za-z0-9_-]+$/.test(customerReference)||
+             !/^nsave_[A-Za-z0-9_-]+$/.test(accountReference))
+            throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
+          const organizations=await store.listManagerOrganizations(user.uid);
+          if(!organizations.length)
+            throw new HttpError(403,'NO_ORGANIZATION_ACCESS','No active manager organization grant');
+          const payload=await nsave.getStatement(accountReference,{start:from,end:to});
+          let statement;
+          try{
+            statement=normalizeNsaveStatement(payload,{accountReference,customerReference,from,to});
+            if(!statement.organizationReference)
+              throw new Error('Missing nSave organization reference');
+            if(process.env.NSAVE_ORGANIZATION_REFERENCE&&
+              statement.organizationReference!==process.env.NSAVE_ORGANIZATION_REFERENCE)
+              throw new Error('Statement organization does not match configured nSave organization');
+          }catch(error){
+            throw new HttpError(409,'STATEMENT_DATA_UNVERIFIED',
+              'Statement not issued: '+String(error?.message||'nSave source data could not be verified').slice(0,220));
+          }
+          const pdf=await renderNsaveStatement(statement);
+          const audit={actorUid:user.uid,organizationReference:statement.organizationReference,
+            customerReference:statement.customerReference,accountReference:statement.accountReference,
+            requestReference:statement.requestReference,from,to};
+          await store.recordStatementAudit({...audit,action:'statement.generated'});
+          await store.recordStatementAudit({...audit,action:'statement.downloaded'});
+          const filename='nsave-statement-'+from+'-to-'+to+'.pdf';
+          return sendPdf(res,pdf,filename,origin);
         }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/statement-readiness'){
           const data=await readJson(req);
