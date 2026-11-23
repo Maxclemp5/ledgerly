@@ -30,6 +30,11 @@ class StatementPdfRendererTest {
             assertEquals(792f,reader.getPageSize(1).getHeight(),.1f);
             assertTrue(reader.getInfo().getOrDefault("Creator", "").contains("LedgerDesk OpenPDF"));
             assertFalse(reader.getInfo().getOrDefault("Producer", "").contains("Quartz PDFContext"));
+            String created=reader.getInfo().get("CreationDate");
+            String modified=reader.getInfo().get("ModDate");
+            assertNotNull(created, "New statement must record creation time");
+            assertNotNull(modified, "New statement must record modification time");
+            assertEquals(created, modified, "Both dates must represent the same issuance instant");
         } finally { reader.close(); }
     }
     @Test void rejectsUnreconciledBalances() throws Exception {
