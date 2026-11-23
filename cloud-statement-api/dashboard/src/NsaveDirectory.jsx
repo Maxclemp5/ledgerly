@@ -1,6 +1,6 @@
 import {nsaveCustomer,nsaveAddressText,nsaveUnpack} from './nsaveProfile.mjs';
 import React,{useState} from 'react';
-import {Search,RefreshCw,ChevronRight,ArrowLeft,FileText,ShieldCheck} from 'lucide-react';
+import {Search,RefreshCw,ChevronRight,ArrowLeft,FileText,ShieldCheck,Eye,EyeOff} from 'lucide-react';
 
 // Search and profile retrieval are performed on the server with organization credentials.
 // Never store the returned banking profile in browser storage or logs.
@@ -13,6 +13,7 @@ const accountsOf=p=>Array.isArray(p?.accounts)?p.accounts:[];
 function Field({label,children}){return <div className="nsave-field"><small>{label}</small><strong>{children}</strong></div>}
 function Profile({profile,onBack,api}){
  const [selected,setSelected]=useState('');
+ const [revealAccounts,setRevealAccounts]=useState(false);
  const [from,setFrom]=useState(''),[to,setTo]=useState('');
  const [error,setError]=useState(''),[result,setResult]=useState('');
  const accounts=accountsOf(profile);
@@ -45,7 +46,12 @@ function Profile({profile,onBack,api}){
    <Field label="Address">{value(nsaveAddressText(address))}</Field>
    <Field label="Bank address">{value(nsaveAddressText(profile.bank_address||accounts[0]?.bank_address))}</Field>
   </div>
-  <h3>Linked nSave bank accounts</h3>
+  <div className="old-bar"><h3>Linked nSave bank accounts</h3>
+   <button type="button" className="old-secondary" aria-pressed={revealAccounts}
+    onClick={()=>setRevealAccounts(v=>!v)} disabled={!accounts.some(a=>a.account_number||a.accountNumber||a.iban)}>
+    {revealAccounts?<EyeOff size={15}/>:<Eye size={15}/>}
+    {revealAccounts?'Hide account numbers':'Show full account numbers'}
+   </button></div>
   {!accounts.length?<p>Linked bank-account details are not included in the nSave profile response. The customer record loaded, but no account list was supplied by this endpoint.</p>:
    <div className="old-overflow"><table><thead><tr><th>Select</th><th>Account</th><th>Bank</th><th>Currency</th><th>Status</th></tr></thead>
     <tbody>{accounts.map((a,i)=>{
@@ -53,10 +59,13 @@ function Profile({profile,onBack,api}){
      return <tr key={aid||i}>
       <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||a.accountNumber||a.iban||aid)}
        checked={selected===aid&&!!aid} disabled={!aid} onChange={()=>{setSelected(aid);setError('');setResult('')}}/></td>
-      <td>{mask(a.account_number||a.accountNumber||a.masked_number||a.iban||aid)}<small>{value(a.account_reference||a.accountReference||a.id||a.account_id)}</small></td>
+      <td>{revealAccounts&& (a.account_number||a.accountNumber||a.iban)
+       ? value(a.account_number||a.accountNumber||a.iban)
+       : mask(a.account_number||a.accountNumber||a.masked_number||a.iban||aid)}<small>{value(a.account_reference||a.accountReference||a.id||a.account_id)}</small></td>
       <td>{value(a.bank_name||a.bankName||a.bank?.name)}</td><td>{value(a.currency||a.currency_code)}</td><td>{value(a.status)}</td>
      </tr>;
     })}</tbody></table></div>}
+  <p>Only reveal full account numbers when necessary for authorized branch verification. They are hidden again when you leave this profile.</p>
   <div className="nsave-statement">
    <h3><FileText size={17}/> Statement generation</h3>
    <p>Select an account and reporting period to check whether the issuer has provided the verified ledger and statement source.</p>
