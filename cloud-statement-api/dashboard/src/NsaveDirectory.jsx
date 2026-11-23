@@ -1,0 +1,148 @@
+import React,{useState} from 'react';
+import {Search,RefreshCw,ChevronRight,ArrowLeft,FileText,ShieldCheck} from 'lucide-react';
+
+// Search and profile retrieval are performed on the server with organization credentials.
+// Never store the returned banking profile in browser storage or logs.
+function unpack(payload){
+ const obj=payload?.data&&typeof payload.data==='object'?payload.data:payload;
+ if(Array.isArray(obj))return {items:obj,next:null};
+ const items=[obj?.customers,obj?.matches,obj?.results,obj?.items].find(Array.isArray);
+ if(items)return {items,next:obj.next_offset??null};
+ if(obj?.customer)return {items:[obj.customer],next:null};
+ return {items:obj&&typeof obj==='object'&&('id' in obj||'customer_id' in obj)?[obj]:[],next:obj?.next_offset??null};
+}
+const customerId=x=>String(x?.id||x?.customer_id||x?.customerId||x?.nsave_reference||'');
+const customerName=x=>String(x?.full_name||x?.fullName||x?.name||
+ [x?.first_name,x?.last_name].filter(Boolean).join(' ')||'Name not supplied');
+const mask=n=>{const s=String(n||'');return s.length<=4?'••••':'•••• '+s.slice(-4)};
+const value=x=>x===undefined||x===null||x===''?'—':String(x);
+const accountsOf=p=>Array.isArray(p?.accounts)?p.accounts:
+ Array.isArray(p?.bank_accounts)?p.bank_accounts:Array.isArray(p?.bankAccounts)?p.bankAccounts:[];
+function Field({label,children}){return <div className="nsave-field"><small>{label}</small><strong>{children}</strong></div>}
+function Profile({profile,onBack,api}){
+ const [selected,setSelected]=useState('');
+ const [from,setFrom]=useState(''),[to,setTo]=useState('');
+ const [error,setError]=useState(''),[result,setResult]=useState('');
+ const accounts=accountsOf(profile);
+ const id=customerId(profile);
+ const address=profile.address&&typeof profile.address==='object'?profile.address:{};
+ const reference=profile.nsave_reference||profile.nsaveReference||id;
+ async function prepare(e){
+  e.preventDefault();setError('');setResult('');
+  if(!selected){setError('Select one of this customer’s accounts.');return}
+  if(!from||!to||from>to){setError('Select a valid statement date range.');return}
+  try{
+   await api('/v1/manager/nsave/statement-readiness',{method:'POST',body:{
+    customerId:id,accountId:selected,from,to
+   }});
+   setResult('Statement source verified. Continue with the authorized issuer statement workflow.');
+  }catch(err){setError(err.message||'Official statement generation is not available yet.')}
+ }
+ return <div className="old-card">
+  <button type="button" className="old-secondary" onClick={onBack}><ArrowLeft size={15}/> Back to customers</button>
+  <div className="old-bar" style={{marginTop:18}}>
+   <div><h2>{customerName(profile)}</h2><p>Live nSave customer profile · Reference {value(reference)}</p></div>
+   <span className="old-chip">{value(profile.kyc_status||profile.kycStatus||profile.status)}</span>
+  </div>
+  <div className="nsave-fields">
+   <Field label="Customer ID">{value(id)}</Field>
+   <Field label="Email">{value(profile.email)}</Field>
+   <Field label="Phone">{value(profile.phone||profile.phone_number)}</Field>
+   <Field label="Created">{value(profile.created_at||profile.createdAt)}</Field>
+   <Field label="KYC">{value(profile.kyc_status||profile.kycStatus)}</Field>
+   <Field label="Address">{value([address.line1,address.line2,address.city,address.region,address.postal_code,address.country].filter(Boolean).join(', '))}</Field>
+  </div>
+  <h3>Linked nSave bank accounts</h3>
+  {!accounts.length?<p>nSave returned no linked accounts for this customer.</p>:
+   <div className="old-overflow"><table><thead><tr><th>Select</th><th>Account</th><th>Bank</th><th>Currency</th><th>Status</th></tr></thead>
+    <tbody>{accounts.map((a,i)=>{
+     const aid=String(a.id||a.account_id||a.accountId||'');
+     return <tr key={aid||i}>
+      <td><input type="radio" name="nsave-account" aria-label={'Select account '+mask(a.account_number||aid)}
+       checked={selected===aid&&!!aid} disabled={!aid} onChange={()=>{setSelected(aid);setError('');setResult('')}}/></td>
+      <td>{mask(a.account_number||a.accountNumber||a.masked_number||aid)}<small>{value(a.id||a.account_id)}</small></td>
+      <td>{value(a.bank_name||a.bankName)}</td><td>{value(a.currency)}</td><td>{value(a.status)}</td>
+     </tr>;
+    })}</tbody></table></div>}
+  <div className="nsave-statement">
+   <h3><FileText size={17}/> Statement generation</h3>
+   <p>Select an account and reporting period to check whether the issuer has provided the verified ledger and statement source.</p>
+   <form className="old-form" onSubmit={prepare}>
+    <div className="nsave-dates">
+     <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)} required/></label>
+     <label>To<input type="date" value={to} min={from||undefined} onChange={e=>setTo(e.target.value)} required/></label>
+    </div>
+    <button type="submit" className="old-primary" disabled={!selected}>Check statement readiness <ChevronRight size={15}/></button>
+   </form>
+   {error&&<div className="old-alert error" role="alert">{error}</div>}
+   {result&&<div className="old-alert ok" role="status">{result}</div>}
+   <p><ShieldCheck size={13}/> Official PDF statements require issuer-verified transactions and opening/closing balances. Customer profiles alone are not sufficient.</p>
+  </div>
+ </div>;
+}
+export default function NsaveDirectory({api}){
+ const [items,setItems]=useState([]),[next,setNext]=useState(null),[loading,setLoading]=useState(false);
+ const [mode,setMode]=useState('name'),[term,setTerm]=useState(''),[error,setError]=useState('');
+ const [selected,setSelected]=useState(null),[busyProfile,setBusyProfile]=useState(false);
+ const [searched,setSearched]=useState(false);
+ async function list(offset=0){
+  setLoading(true);setError('');if(offset===0){setItems([]);setSelected(null)}
+  try{
+   const data=await api('/v1/manager/nsave/customers?limit=50&offset='+encodeURIComponent(String(offset)));
+   const parsed=unpack(data);
+   setItems(old=>offset===0?parsed.items:[...old,...parsed.items]);
+   setNext(parsed.next);setSearched(true);
+  }catch(e){setError(e.message||'Unable to load nSave customers')}finally{setLoading(false)}
+ }
+ async function search(e){
+  e.preventDefault();setError('');setSelected(null);setItems([]);setNext(null);setSearched(false);
+  const q=term.trim();
+  if(!q||q.length>160){setError('Enter a valid exact account number or full customer name.');return}
+  if(mode==='account_number'&&!/^[0-9]+$/.test(q)){setError('The exact account number must contain digits only, including leading zeros.');return}
+  setLoading(true);
+  try{
+   const data=await api('/v1/manager/nsave/customers/search',{method:'POST',body:{[mode]:q}});
+   const parsed=unpack(data);setItems(parsed.items);setSearched(true);
+  }catch(err){setError(err.message||'Customer search failed')}finally{setLoading(false)}
+ }
+ async function select(item){
+  const id=customerId(item);setError('');
+  if(!id){setError('This nSave search result has no usable customer reference.');return}
+  setBusyProfile(true);
+  try{
+   const data=await api('/v1/manager/nsave/customers/'+encodeURIComponent(id));
+   const profile=data?.customer||data?.data||data;
+   if(!profile||typeof profile!=='object')throw new Error('nSave returned an invalid customer profile.');
+   setSelected(profile);
+  }catch(e){setError(e.message||'Customer profile could not be loaded')}finally{setBusyProfile(false)}
+ }
+ if(selected)return <Profile key={customerId(selected)} profile={selected} api={api} onBack={()=>setSelected(null)}/>;
+ return <div className="old-card">
+  <div className="old-bar">
+   <div><h2>nSave customer directory</h2><p>Browse authorized nSave customer records or search by exact account number or full name.</p></div>
+   <button type="button" className="old-secondary" disabled={loading} onClick={()=>list(0)}><RefreshCw size={15}/> Browse customers</button>
+  </div>
+  <form className="old-search" onSubmit={search}>
+   <Search size={17}/>
+   <select aria-label="Search method" value={mode} onChange={e=>{setMode(e.target.value);setTerm('')}}>
+    <option value="name">Full name</option><option value="account_number">Account number</option>
+   </select>
+   <input aria-label="Search nSave customers" autoComplete="off" value={term} maxLength={160}
+    onChange={e=>setTerm(e.target.value)} placeholder={mode==='name'?'Full customer name':'Exact account number'}/>
+   <button type="submit" className="old-primary" disabled={loading}>Search</button>
+  </form>
+  {error&&<div className="old-alert error" role="alert">{error}</div>}
+  {loading&&<p className="old-loading">Retrieving nSave customer profiles…</p>}
+  {busyProfile&&<p className="old-loading">Loading full customer profile…</p>}
+  {searched&&!loading&&(!items.length?<p>No customer records returned.</p>:
+   <div className="old-overflow"><table><thead><tr><th>Customer</th><th>Reference</th><th>KYC</th><th>Action</th></tr></thead>
+    <tbody>{items.map((item,i)=><tr key={customerId(item)||i}>
+     <td><b>{customerName(item)}</b></td><td className="old-id">{value(customerId(item))}</td>
+     <td>{value(item.kyc_status||item.kycStatus)}</td>
+     <td><button className="old-secondary" type="button" disabled={busyProfile} onClick={()=>select(item)}>
+       View profile <ChevronRight size={14}/></button></td>
+    </tr>)}</tbody></table></div>)}
+  {next!==null&&next!==undefined&&<button type="button" className="old-secondary" disabled={loading} onClick={()=>list(next)}>Load more customers</button>}
+  <p>Profiles are retrieved live. Full account numbers are masked in this dashboard.</p>
+ </div>;
+}
