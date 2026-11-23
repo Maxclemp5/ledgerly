@@ -31,7 +31,7 @@ if(nsave.configured()){
   void nsave.listCustomers({limit:1,offset:0}).then(
     ()=>console.info('nSave API connection check: SUCCESS'),
     error=>console.warn('nSave API connection check: FAILED ('+
-      (['NSAVE_AUTH_FAILED','UPSTREAM_RATE_LIMIT','NSAVE_API_ERROR'].includes(error?.code)
+      (['NSAVE_AUTH_FAILED','NSAVE_SERVICE_TOKEN_REJECTED','UPSTREAM_RATE_LIMIT','NSAVE_API_ERROR'].includes(error?.code)
         ? error.code : 'NETWORK_OR_RESPONSE_ERROR')+')')
   );
 }else{
