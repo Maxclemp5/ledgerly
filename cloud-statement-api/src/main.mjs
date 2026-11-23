@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {spawn} from 'node:child_process';
 import {createHandler} from './handler.mjs';
 import {createNeonVerifier} from './neonAuth.mjs';
 import {makePool,StatementRepository} from './repository.mjs';
@@ -38,6 +39,32 @@ if(nsave.configured()){
   console.warn('nSave API connection check: NOT_CONFIGURED');
 }
 
+// The production Free container contains a Java/OpenPDF worker in this same
+// network namespace. Bind exclusively to loopback: no public renderer port.
+// The existing stand-alone renderer remains available for other deployments.
+let pdfWorker=null;
+if(process.env.LEDGERDESK_EMBEDDED_PDF_URL){
+  if(process.env.LEDGERDESK_EMBEDDED_PDF_URL!=='http://127.0.0.1:10001')
+    throw new Error('Embedded PDF worker URL must be loopback:10001');
+  if(!process.env.PDF_STAMPER_TOKEN||process.env.PDF_STAMPER_TOKEN.length<32)
+    throw new Error('PDF_STAMPER_TOKEN required for embedded PDF renderer');
+  pdfWorker=spawn('java',[
+    '-Xms32m','-Xmx192m','-XX:MaxMetaspaceSize=96m',
+    '-XX:MaxDirectMemorySize=32m','-XX:ActiveProcessorCount=2',
+    '-jar','/app/openpdf.jar'
+  ],{
+    env:{...process.env,PORT:'10001',PDF_BIND_HOST:'127.0.0.1'},
+    stdio:'inherit'
+  });
+  pdfWorker.on('error',error=>{
+    console.error('Embedded PDF worker failed to start:',error?.code||'UNKNOWN');
+    process.exit(1);
+  });
+  pdfWorker.on('exit',(code,signal)=>{
+    console.error('Embedded PDF worker exited unexpectedly:',code??signal??'UNKNOWN');
+    process.exit(1);
+  });
+}
 const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN,nsave});
 const port=Number(process.env.PORT||10000);
 const serveStatic=createStaticHandler({authBaseUrl:process.env.NEON_AUTH_BASE_URL});
@@ -55,4 +82,7 @@ const server=http.createServer(async(req,res)=>{
 server.listen(port,'0.0.0.0',()=>{
   console.log('Ledger Desk statement-request API listening on port '+port);
 });
-process.on('SIGTERM',()=>server.close(()=>pool.end().finally(()=>process.exit(0))));
+process.on('SIGTERM',()=>{
+  if(pdfWorker){pdfWorker.removeAllListeners('exit');pdfWorker.kill('SIGTERM');}
+  server.close(()=>pool.end().finally(()=>process.exit(0)));
+});
