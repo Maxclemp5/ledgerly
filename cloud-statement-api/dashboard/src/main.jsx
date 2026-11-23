@@ -181,9 +181,13 @@ function useManagerApi(client,onUnauthorized){
       body:options.body?JSON.stringify(options.body):undefined,
       cache:'no-store'
     });
-    const data=await response.json().catch(()=>({}));
     if(response.status===401){onUnauthorized();throw new Error('Session expired. Please sign in again.');}
-    if(!response.ok)throw new Error(data?.error?.message||'Request failed ('+response.status+')');
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data?.error?.message||'Request failed ('+response.status+')');
+    }
+    if(options.responseType==='blob')return response.blob();
+    const data=await response.json().catch(()=>({}));
     return data.data;
   },[client,onUnauthorized]);
 }
