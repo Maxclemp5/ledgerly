@@ -1,6 +1,7 @@
 import React,{useState,useEffect,useCallback} from 'react';
 import {LayoutDashboard,Users,ArrowLeftRight,FileText,BarChart3,ShieldCheck,ScrollText,Settings,Plus,Search,RefreshCw,ArrowRight,Archive,Pencil,LockKeyhole} from 'lucide-react';
 import './legacyAdmin.css';
+import NsaveDirectory from './NsaveDirectory.jsx';
 
 const modules=[
  ['dashboard','Dashboard',LayoutDashboard],['customers','Customers',Users],
@@ -128,7 +129,7 @@ function Customers({api,orgs,changed}){
   catch(e){setError(e.message)}
  }
  return <>
-  <NsaveLookup api={api}/>
+  <NsaveDirectory api={api}/>
   <div className="old-bar"><div><h2>Internal customer management</h2><p>Manage separate, unverified LedgerDesk profiles for your authorized issuer.</p></div><button className="old-primary" onClick={()=>start()}><Plus size={16}/> Add Customer</button></div>
   <Alert error={error} ok={ok}/>
   {open&&<div className="old-card old-edit"><div className="old-bar"><h2>{editing?'Edit Customer':'New Customer'}</h2><button className="old-secondary" onClick={()=>setOpen(false)}>Close</button></div>
