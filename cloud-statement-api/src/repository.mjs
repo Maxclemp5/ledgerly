@@ -66,6 +66,15 @@ export class StatementRepository {
       'ORDER BY issuer_org_id LIMIT 20',[uid]);
     return result.rows;
   }
+  async recordStatementAudit({actorUid,organizationReference,customerReference,accountReference,requestReference,from,to,action}){
+    if(!['statement.generated','statement.downloaded'].includes(action))
+      throw new Error('Invalid statement audit action');
+    await this.pool.query(
+      'INSERT INTO statement_delivery_audit '+
+      '(actor_uid,organization_reference,customer_reference,account_reference,request_reference,period_start,period_end,action) '+
+      'VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [actorUid,organizationReference,customerReference,accountReference,requestReference,from,to,action]);
+  }
   async getManagerSummary(uid){
     const [accounts,requests]=await Promise.all([
       this.pool.query(
