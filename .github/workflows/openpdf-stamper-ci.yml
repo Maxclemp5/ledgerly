@@ -33,6 +33,8 @@ jobs:
         run: python scripts/extract_design_assets.py
       - name: Maven build and OpenPDF tests
         run: mvn -B --no-transfer-progress clean verify
+      - name: Verify native layout against reference coordinates
+        run: python scripts/validate_layout.py
       - name: Upload native PDF layout preview for visual review
         if: always()
         uses: actions/upload-artifact@v4
