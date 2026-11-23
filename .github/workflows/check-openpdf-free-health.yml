@@ -23,3 +23,19 @@ jobs:
           done
           echo 'OpenPDF health unavailable after multiple attempts'
           exit 1
+
+      - name: Probe Java from within Node Free network path
+        shell: bash
+        run: |
+          for attempt in $(seq 1 12); do
+            code=$(curl -sS --connect-timeout 8 --max-time 15 -o /tmp/node-pdf-health.txt -w '%{http_code}' \
+              https://ledgerly-free-test-api.onrender.com/health/openpdf || true)
+            echo "Node-to-Java attempt $attempt: HTTP $code"
+            cat /tmp/node-pdf-health.txt || true
+            echo
+            if [ "$code" = "200" ] && grep -q '"upstream":"healthy"' /tmp/node-pdf-health.txt; then
+              echo 'Node-to-Java network path verified'; exit 0
+            fi
+            sleep 8
+          done
+          echo 'Node-to-Java path unhealthy'; exit 1
