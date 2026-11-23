@@ -79,3 +79,17 @@ test('date-scoped customer lookup rejects missing, malformed, reversed dates syn
  assert.throws(()=>api.getCustomer('cus_test',{start:'2026-13-01',end:'2026-11-23'}),/Invalid nSave/);
  assert.throws(()=>api.getCustomer('cus_test',{start:'2026-11-23',end:'2026-11-01'}),/Invalid nSave/);
 });
+
+test('calls the approved nSave statement endpoint with account reference and period',async()=>{
+ let url,options;
+ const api=createNsaveClient({env,request:async(u,o)=>{url=u;options=o;return new Response('{}',{status:200})}});
+ await api.getStatement('nsave_acct_test',{start:'2026-11-01',end:'2026-11-23'});
+ assert.equal(url,'https://nsave.work/api/v1/statements/nsave_acct_test?start=2026-11-01&end=2026-11-23');
+ assert.equal(options.headers['OAI-Sites-Authorization'],'Bearer site-secret');
+ assert.equal(options.headers.Authorization,'Bearer manager-secret');
+});
+test('statement endpoint rejects unsafe references and invalid periods',()=>{
+ const api=createNsaveClient({env,request:async()=>new Response('{}',{status:200})});
+ assert.throws(()=>api.getStatement('../customers',{start:'2026-11-01',end:'2026-11-23'}),/account reference/);
+ assert.throws(()=>api.getStatement('nsave_acct_test',{start:'2026-11-23',end:'2026-11-01'}),/reporting period/);
+});
