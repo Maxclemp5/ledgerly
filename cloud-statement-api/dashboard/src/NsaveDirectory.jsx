@@ -32,7 +32,7 @@ function Profile({profile,onBack,api}){
    const raw=pulled?.statement?.data||pulled?.statement||{};
    const summary=raw?.account_summary||raw?.accountSummary||raw?.ledger_summary||raw?.ledgerSummary||raw?.summary||raw?.data?.account_summary||raw?.statement_summary||{};
    const transactions=raw?.transactions||raw?.items||raw?.entries||raw?.data?.transactions||[];
-   setResult({summary,transactions:Array.isArray(transactions)?transactions:[],fields:Object.keys(raw||{}),from,to,note:pulled?.note||'nSave statement data retrieved.'});
+   setResult({summary,transactions:Array.isArray(transactions)?transactions:[],fields:Object.keys(raw||{}),schema:pulled?.statementSchema||null,from,to,note:pulled?.note||'nSave statement data retrieved.'});
   }catch(err){setError(err.message||'Unable to retrieve nSave date-scoped summary.')}finally{setChecking(false)}
  }
  return <div className="old-card">
@@ -95,8 +95,8 @@ function Profile({profile,onBack,api}){
        ].filter(([,v])=>v!==undefined&&v!==null).map(([label,v])=>
         <Field key={label} label={label}>{value(v)}</Field>)}
       </div>:
-      <p>The statement endpoint responded, but its account-summary fields are not mapped yet. Returned data sections: {result.fields.join(', ')||'none'}. Please check the endpoint response mapping.</p>}
-    <p>nSave returned {result.transactions.length} transaction record(s) for this period. PDF issuance will be enabled after the response fields are mapped and reconciled against the supplied template.</p>
+      <p>The statement endpoint responded, but its account-summary fields are not mapped yet. The privacy-safe response structure is shown below; it contains field names and data types only, not customer values.</p>}
+    <p>Detected transaction records: {result.transactions.length}. This count is provisional until the transaction-array path is confirmed from the response structure.\n    {result.schema&&<details className="nsave-schema"><summary>View sanitized response structure</summary><pre>{JSON.stringify(result.schema,null,2)}</pre></details>}\n    <p>Statement PDF issuance remains disabled until the returned fields are mapped and reconciled against the supplied template.</p></p>
    </div>}
    <p><ShieldCheck size={13}/> No transactions during a period is valid. Statement PDF delivery requires issuer-verified opening and closing balances and an authorized statement source.</p>
   </div>
