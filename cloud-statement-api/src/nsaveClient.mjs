@@ -17,7 +17,7 @@ function takeSlot(key,now=Date.now()){
   b.count++;
 }
 function safePath(path){
-  if(!['customers','customers/search'].includes(path))throw new Error('Unsupported nSave API route');
+  if(path!=='customers'&&path!=='customers/search'&&!/^customers\/[A-Za-z0-9_%.-]+$/.test(path))throw new Error('Unsupported nSave API route');
   return API_BASE+'/'+path;
 }
 export function createNsaveClient({env=process.env,request=fetch,now=Date.now}={}){
