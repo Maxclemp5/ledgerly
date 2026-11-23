@@ -57,19 +57,31 @@ export function verifyNsaveCustomerAccountBinding(profilePayload,{customerId,acc
   if(bankAccounts.length!==1)
     throw new Error('Selected account is not uniquely linked to the authenticated nSave customer profile');
   const account=bankAccounts[0];
-  const explicitReferences=new Set(
-    [account.nsave_reference,account.nsaveReference]
-      .filter(v=>typeof v==='string'&&v.trim()));
-  // Customer-level reference is checked only when it is present in the trusted
-  // profile; never compute one from internal IDs or accept a browser override.
+  const accountReferences=[account.nsave_reference,account.nsaveReference]
+    .filter(v=>typeof v==='string'&&v.trim());
+  const customerReferences=[];
+  // Read customer-level identity only from an explicitly identified customer
+  // object. These are independent authoritative claims, not interchangeable IDs.
   for(const item of sources){
     if(item===account)continue;
     if(item.nsave_reference&&typeof item.nsave_reference==='string'&&
       (item.id===customerId||item.customer_id===customerId||item.customerId===customerId))
-      explicitReferences.add(item.nsave_reference);
+      customerReferences.push(item.nsave_reference);
   }
-  if(explicitReferences.size>0&&!explicitReferences.has(statementCustomerReference))
-    throw new Error('nSave ledger customer reference conflicts with the authenticated customer profile');
+  const allRefs=[...accountReferences,...customerReferences];
+  if(allRefs.some(x=>x!==statementCustomerReference)){
+    const err=new Error('Customer identity conflict between nSave customer and statement APIs. Statement issuance is blocked pending nSave source correction.');
+    err.code='NSAVE_CUSTOMER_REFERENCE_CONFLICT';
+    err.diagnostics={
+      selectedCustomerIdentityConfirmed:ids.size>0&&ids.has(customerId),
+      selectedAccountLinkedToCustomer:bankAccounts.length===1,
+      accountOwnerReferencePresent:accountReferences.length>0,
+      accountOwnerReferenceMatchesLedger:accountReferences.length===0?null:accountReferences.every(x=>x===statementCustomerReference),
+      profileOwnerReferencePresent:customerReferences.length>0,
+      profileOwnerReferenceMatchesLedger:customerReferences.length===0?null:customerReferences.every(x=>x===statementCustomerReference)
+    };
+    throw err;
+  }
   return true;
 }
 function sendPdf(res,buffer,filename,origin=''){
@@ -247,8 +259,10 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
               statement.organizationReference!==process.env.NSAVE_ORGANIZATION_REFERENCE)
               throw new Error('Statement organization does not match configured nSave organization');
           }catch(error){
-            throw new HttpError(409,'STATEMENT_DATA_UNVERIFIED',
+            const issue=new HttpError(409,error?.code||'STATEMENT_DATA_UNVERIFIED',
               'Statement not issued: '+String(error?.message||'nSave source data could not be verified').slice(0,220));
+            if(error?.code==='NSAVE_CUSTOMER_REFERENCE_CONFLICT')issue.diagnostics=error.diagnostics;
+            throw issue;
           }
           const pdf=await renderNsaveStatement(statement);
           const audit={actorUid:user.uid,organizationReference:statement.organizationReference,
@@ -357,7 +371,8 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       if(error?.name==='SourceNotVerified')
         return send(res,409,{error:{code:'NOT_VERIFIED',message:'Account is not issuer-verified'}},origin);
       if(error instanceof HttpError)
-        return send(res,error.status,{error:{code:error.code,message:error.message}},origin);
+        return send(res,error.status,{error:{code:error.code,message:error.message,
+          ...(error.diagnostics?{diagnostics:error.diagnostics}:{})}},origin);
       if(error?.code==='NSAVE_SERVICE_TOKEN_REJECTED')
         return send(res,502,{error:{code:'NSAVE_SERVICE_TOKEN_REJECTED',
           message:"nSave rejected the service token. Check Render's NSAVE_SITE_SERVICE_TOKEN against Fly's LEDGER_SERVICE_TOKEN."}},origin);
