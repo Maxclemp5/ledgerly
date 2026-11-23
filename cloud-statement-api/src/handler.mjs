@@ -81,7 +81,32 @@ async function renderWithOpenPdf(statement){
   let response;
   let networkFailure=false;
   const renderUrl=new URL('/render',base);
-  const deadline=Date.now()+110000;
+  const deadline=Date.now()+105000;
+  // A separate Render Free service can be spun down after 15 minutes idle.
+  // Never POST bank data until the no-auth /health endpoint is actually ready.
+  // Health GET is safe to repeat; no customer details or credentials are sent.
+  const healthUrl=new URL('/health',base);
+  let healthy=false;
+  for(let attempt=0;Date.now()<deadline-25000;attempt++){
+    let healthStatus='network';
+    try{
+      const maxWait=Math.min(12000,deadline-Date.now()-25000);
+      if(maxWait<=0)break;
+      const health=await fetch(healthUrl,{method:'GET',signal:AbortSignal.timeout(maxWait)});
+      healthStatus=health.status;
+      if(health.ok){
+        const data=await health.json().catch(()=>null);
+        if(data?.status==='ok'){healthy=true;break;}
+        healthStatus='invalid-health';
+      }
+    }catch{}
+    console.warn('OpenPDF health readiness pending',healthStatus,'attempt',attempt+1);
+    if(Date.now()+5000>=deadline-25000)break;
+    await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  if(!healthy)
+    throw new HttpError(503,'PDF_STAMPER_NOT_READY',
+      'The OpenPDF Free service did not become ready. Check its Render instance health.');
   for(let attempt=0;attempt<4;attempt++){
     try {
       const remaining=deadline-Date.now();
