@@ -130,19 +130,28 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
           return send(res,200,{data:await nsave.listCustomers({limit,offset})},origin);
         }
         const detail=/^\/v1\/manager\/nsave\/customers\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
-        if(req.method==='GET'&&detail)
-          return send(res,200,{data:await nsave.getCustomer(detail[1])},origin);
+        if(req.method==='GET'&&detail){
+          const start=url.searchParams.get('start'),end=url.searchParams.get('end');
+          if((start===null)!==(end===null))
+            throw new HttpError(400,'BAD_DATES','Provide both start and end dates');
+          if(start!==null)validPeriod({from:start,to:end});
+          return send(res,200,{data:await nsave.getCustomer(detail[1],
+            start===null?{}:{start,end})},origin);
+        }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/statement-readiness'){
           const data=await readJson(req);
           const customerId=input(data,'customerId',160),accountId=input(data,'accountId',160);
-          validPeriod(data);
+          const {from,to}=validPeriod(data);
           if(!/^[A-Za-z0-9_-]+$/.test(customerId)||!/^[A-Za-z0-9_-]+$/.test(accountId))
             throw new HttpError(400,'BAD_INPUT','Invalid nSave customer or account reference');
-          // Customer lookups alone do not establish authoritative ledger transactions,
-          // opening/closing balance checkpoints, or issuer-approved statement PDFs.
-          // Do not issue a downloadable statement from customer metadata.
-          throw new HttpError(409,'ISSUER_LEDGER_NOT_CONNECTED',
-            'This account may have zero transactions and can still qualify for a statement. LedgerDesk cannot issue an official statement until this workflow can retrieve verified opening/closing balances and issuer-approved statement delivery from the connected ledger.');
+          // Pull date-scoped customer/ledger summary using the documented nSave route.
+          // Do not generate or certify a statement until issuer-provided statement
+          // balances/transactions have been independently reconciled.
+          const profile=await nsave.getCustomer(customerId,{start:from,end:to});
+          return send(res,200,{data:{source:'NSAVE_DATED_CUSTOMER_PROFILE',
+            customerId,accountId,from,to,profile,
+            officialStatementReady:false,
+            note:'Date-scoped nSave data retrieved. A bank-issued statement PDF is not yet configured.'}},origin);
         }
         if(req.method==='POST'&&url.pathname==='/v1/manager/nsave/customers/search'){
           const criteria=await readJson(req);
