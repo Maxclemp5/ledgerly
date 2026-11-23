@@ -75,16 +75,10 @@ public final class StatementPdfRenderer {
     private void stampProfile(PdfContentByte c, JsonNode s) throws Exception {
         draw(c, semibold, "Account Statement " + s.path("currency").asText(), 20.6f, 15.3f, 682.5f, 0, 0, 0);
         draw(c, regular, date(s.path("from").asText()) + " - " + date(s.path("to").asText()), 13.8f, 15.3f, 659.5f, MR, MG, MB);
-        label(c, "Name", 15.3f, 629.5f); value(c, s.path("customerName").asText(), 158.1f, 629.5f, 10.3f, 205);
-        label(c, "Address", 15.3f, 609.7f);
         List<String> lines = wrap(s.path("address").asText(), regular, 10.3f, 205);
         if (lines.size() > 3) throw new IllegalArgumentException("Customer address exceeds the template's three-line address area");
         for (int i=0;i<lines.size();i++) value(c, lines.get(i), 158.1f, 609.7f-i*12.9f, 10.3f, 205);
-        label(c, "Bank", 15.3f, 541.5f); value(c, s.path("bankName").asText().toUpperCase(Locale.US), 158.1f, 541.5f, 10.3f, 225);
-        label(c, "Bank Address", 15.3f, 521.7f); value(c, s.path("bankAddress").asText(), 158.1f, 521.7f, 10.3f, 360);
-        label(c, "Account Number", 15.3f, 501.9f); value(c, s.path("accountNumber").asText(), 158.1f, 501.9f, 10.3f, 200);
         if (!s.path("routingNumber").asText().isBlank()) {
-            label(c, "Routing Number", 15.3f, 482.1f); value(c, s.path("routingNumber").asText(), 158.1f, 482.1f, 10.3f, 200);
         }
         String[] labels={"Opening Balance","Closing Balance","Total Payments","Total Deposits"};
         String[] keys={"opening","closing","payments","deposits"};
@@ -111,7 +105,6 @@ public final class StatementPdfRenderer {
         }
     }
 
-    private void label(PdfContentByte c,String t,float x,float y){ draw(c,regular,t,10.3f,x,y,0,0,0); }
     private void value(PdfContentByte c,String t,float x,float y,float size,float width) throws Exception {
         float actual=size; while(actual>7 && regular.getWidthPoint(t,actual)>width) actual-=.25f;
         if(regular.getWidthPoint(t,actual)>width) throw new IllegalArgumentException("A statement field exceeds its template coordinate width");
