@@ -24,14 +24,12 @@ public final class StatementPdfRenderer {
     private static final float MR = .47f, MG = .45f, MB = .43f;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private final byte[] template;
-    private final BaseFont regular, semibold;
+    private final BaseFont regular;
 
     public StatementPdfRenderer() throws Exception {
         template = resource("/template/nsave-statement-template.pdf");
-        regular = BaseFont.createFont("Inter-Regular.otf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED,
-                true, resource("/fonts/Inter-Regular.otf"), null);
-        semibold = BaseFont.createFont("Inter-SemiBold.otf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED,
-                true, resource("/fonts/Inter-SemiBold.otf"), null);
+        regular = BaseFont.createFont("Inter-Regular.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED,
+                true, resource("/fonts/Inter-Regular.ttf"), null);
     }
 
     public byte[] render(JsonNode s) throws Exception {
@@ -62,7 +60,7 @@ public final class StatementPdfRenderer {
     }
 
     private void mask(PdfContentByte c, boolean first) {
-        white(c, 13, 84, 335, 54);
+        white(c, 13, 115, 250, 23);
         white(c, 151, 148, 230, 20);
         white(c, 151, 168, 245, 48);
         white(c, 151, 228, 230, 20);
@@ -97,7 +95,7 @@ public final class StatementPdfRenderer {
     private void stampContinuation(PdfContentByte c, JsonNode s) throws Exception {
         draw(c, semibold, "Account Statement " + s.path("currency").asText() + " (continued)", 16f, 15.3f, 682.5f, 0, 0, 0);
         draw(c, regular, date(s.path("from").asText()) + " - " + date(s.path("to").asText()), 13f, 15.3f, 659.5f, MR, MG, MB);
-        draw(c, semibold, "Transactions continued", 10.3f, 15.3f, 630f, 0, 0, 0);
+        draw(c, regular, "Transactions continued", 10.3f, 15.3f, 630f, 0, 0, 0);
     }
 
     private void stampTransactions(PdfContentByte c, JsonNode txs, int page, int perPage, String currency) throws Exception {
@@ -113,7 +111,7 @@ public final class StatementPdfRenderer {
         }
     }
 
-    private void label(PdfContentByte c,String t,float x,float y){ draw(c,semibold,t,10.3f,x,y,0,0,0); }
+    private void label(PdfContentByte c,String t,float x,float y){ draw(c,regular,t,10.3f,x,y,0,0,0); }
     private void value(PdfContentByte c,String t,float x,float y,float size,float width) throws Exception {
         float actual=size; while(actual>7 && regular.getWidthPoint(t,actual)>width) actual-=.25f;
         if(regular.getWidthPoint(t,actual)>width) throw new IllegalArgumentException("A statement field exceeds its template coordinate width");
@@ -155,6 +153,6 @@ public final class StatementPdfRenderer {
         for(String k:new String[]{"opening","closing","payments","deposits"})if(!s.path(k).isIntegralNumber())throw new IllegalArgumentException("Invalid monetary field: "+k);
         if(s.path("opening").asLong()+s.path("deposits").asLong()-s.path("payments").asLong()!=s.path("closing").asLong())
             throw new IllegalArgumentException("Statement totals do not reconcile");
-        if(!s.path("currency").asText().matches("[A-Z]{3}"))throw new IllegalArgumentException("Invalid currency");
+        if(!"USD".equals(s.path("currency").asText()))throw new IllegalArgumentException("The approved nSave template supports USD statements only");
     }
 }
