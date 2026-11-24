@@ -1,0 +1,40 @@
+name: PDF Reliability Branch Tests
+on:
+  push:
+    branches:
+      - feature/pdf-reliability-v1
+  workflow_dispatch:
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud-statement-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Run backend unit tests
+        run: npm test
+      - name: Validate syntax
+        run: |
+          node --check src/main.mjs
+          node --check src/handler.mjs
+          node --check src/pdfReadiness.mjs
+  dashboard-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud-statement-api/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Build manager dashboard
+        run: npm run build
