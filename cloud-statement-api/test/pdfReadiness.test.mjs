@@ -66,3 +66,25 @@ test('unhealthy worker eventually times out with bounded retries',async()=>{
   assert.equal(readiness.snapshot().status,'unavailable');
   assert.equal(calls,4);
 });
+
+test('refresh after readiness TTL keeps worker available during successful recheck',async()=>{
+  let clock=1000, finish, calls=0;
+  const readiness=createPdfReadiness({
+    getBase:()=> 'http://127.0.0.1:10001',
+    now:()=>clock,readyTtlMs:15000,
+    fetchImpl:async()=>{
+      calls++;
+      if(calls===1)return good();
+      return new Promise(resolve=>{finish=()=>resolve(good());});
+    }
+  });
+  assert.equal(await readiness.warm(),true);
+  clock+=16000;
+  const state=readiness.begin();
+  assert.equal(state.ready,true);
+  assert.equal(state.status,'ready');
+  // Allow the deferred probe to finish, then verify readiness remains true.
+  finish();
+  assert.equal(await readiness.warm(),true);
+  assert.equal(readiness.snapshot().status,'ready');
+});
