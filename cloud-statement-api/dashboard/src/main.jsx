@@ -249,7 +249,8 @@ function ManagerWorkspace({client,session,onSignOut}){
       <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={()=>setMobile(!mobile)}><Menu size={21}/></button>
           <div className="breadcrumb">Organization <ChevronRight size={15}/> <strong>Manager Dashboard</strong></div>
         </div><div className="topbar-right">
-          {access?.manager&&!access?.pendingPasswordChange&&<span className="environment-badge" role="status" aria-live="polite">PDF: {pdfStatus==='ready'?'Ready':pdfStatus==='unavailable'?'Checking service…':'Starting service…'}</span>}
+          {access?.manager&&!access?.pendingPasswordChange&&<span className="environment-badge" role="status" aria-live="polite">PDF: {pdfStatus==='ready'?'Ready':pdfStatus==='unavailable'?'Needs retry':pdfStatus==='recovering'?'Recovering…':'Starting…'}</span>}
+          {access?.manager&&pdfStatus==='unavailable'&&<button className="icon-button" title="Retry PDF readiness" aria-label="Retry PDF readiness" onClick={()=>{setPdfStatus('starting');setRefresh(v=>v+1);}}><RefreshCw size={17}/></button>}
           <span className="environment-badge"><span className="live-light"/> TEST ENVIRONMENT</span>
           <div className="user-info"><span className="user-avatar">{String(user)[0]?.toUpperCase()||'M'}</span>
             <span className="user-name"><strong>{user}</strong><small>Organization manager</small></span></div>
