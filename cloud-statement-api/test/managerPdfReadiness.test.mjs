@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
+import http from 'node:http';
 import {createHandler} from '../src/handler.mjs';
 
 async function invoke(handler,url='/v1/manager/pdf-readiness'){
@@ -61,4 +62,30 @@ test('manager without an active organization grant cannot wake the PDF renderer'
   const result=await invoke(handler);
   assert.equal(result.status,403);
   assert.equal(called,false);
+});
+
+test('real HTTP manager readiness route rejects missing token and accepts scoped manager token',async()=>{
+  let warmCalls=0;
+  const verifyToken=async token=>{
+    if(token!=='staging-authorized-manager-token')throw Error('invalid token');
+    return {uid:'manager-test-uid'};
+  };
+  const handler=createHandler({
+    verify:verifyToken,store:fakeStore(),
+    pdfReadiness:{begin:()=>{warmCalls++;return {status:'ready',ready:true,attempt:1,lastCheckedAt:null};}}
+  });
+  const server=http.createServer(handler);
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  try{
+    const url='http://127.0.0.1:'+server.address().port+'/v1/manager/pdf-readiness';
+    const unauthorized=await fetch(url);
+    assert.equal(unauthorized.status,401);
+    assert.equal(warmCalls,0);
+    const authenticated=await fetch(url,{headers:{authorization:'Bearer staging-authorized-manager-token'}});
+    assert.equal(authenticated.status,200);
+    assert.equal((await authenticated.json()).data.ready,true);
+    assert.equal(warmCalls,1);
+  } finally {
+    await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
+  }
 });
