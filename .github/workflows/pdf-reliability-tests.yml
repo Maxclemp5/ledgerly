@@ -84,3 +84,49 @@ jobs:
           console.error('STAGING_HTTP_SMOKE: FAILED (renderer not ready within 180 seconds)');
           process.exit(1);
           NODE
+
+  manager-staging-smoke:
+    # Separate Neon staging project; no production identities or customer data.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Manager staging frontend, auth configuration and anonymous denial
+        env:
+          MANAGER_STAGING_URL: https://ledgerdesk-manager-integration-staging.onrender.com
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base=process.env.MANAGER_STAGING_URL;
+          async function request(path,init={}){
+            const c=new AbortController();
+            const timer=setTimeout(()=>c.abort(),100000);
+            try{return await fetch(base+path,{...init,signal:c.signal});}
+            finally{clearTimeout(timer);}
+          }
+          const deadline=Date.now()+200000;
+          let passed=false;
+          while(Date.now()<deadline){
+            try{
+              const cfg=await request('/public-config');
+              assert.equal(cfg.status,200);
+              const json=await cfg.json();
+              assert.equal(json.authProxyUrl,'/auth');
+              assert.ok(json.authUrl.includes('.neonauth.'));
+              const denied=await request('/v1/manager/pdf-readiness');
+              assert.equal(denied.status,401);
+              const page=await request('/');
+              assert.equal(page.status,200);
+              const html=await page.text();
+              assert.ok(html.includes('<html')||html.includes('<!doctype html'));
+              console.log('MANAGER_STAGING_HTTP_SMOKE: PASSED; independent login frontend, auth settings and anonymous denial');
+              passed=true;break;
+            }catch(error){
+              console.error('Manager staging initializing:',error.message);
+              await new Promise(resolve=>setTimeout(resolve,5000));
+            }
+          }
+          if(!passed)process.exit(1);
+          NODE
