@@ -117,6 +117,15 @@ jobs:
               assert.ok(json.authUrl.includes('.neonauth.'));
               const denied=await request('/v1/manager/pdf-readiness');
               assert.equal(denied.status,401);
+              // Safe route diagnostic: intentionally omit email, so no OTP is sent.
+              // A 400/422 indicates the route exists; a 404 indicates a broken path.
+              const otpRoute=await request('/auth/email-otp/send-verification-otp',{
+                method:'POST',headers:{'content-type':'application/json'},
+                body:JSON.stringify({type:'email-verification'})
+              });
+              console.log('MANAGER_OTP_ROUTE_DIAGNOSTIC: HTTP '+otpRoute.status);
+              assert.ok([400,401,403,422,429].includes(otpRoute.status),
+                'OTP API route unexpected status='+otpRoute.status);
               // Real Neon sign-in endpoint must reject an incorrect password.
               // No credentials or OTPs are logged or stored in this repository.
               const badLogin=await request('/auth/sign-in/email',{
