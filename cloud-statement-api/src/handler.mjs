@@ -235,7 +235,7 @@ async function principal(req,verify) {
     return p;
   }catch {throw new HttpError(401,'AUTH_REQUIRED','Session invalid or revoked')}
 }
-export function createHandler({verify,store,allowedOrigin='',logger=console,enableCustomerModule=false,nsave=null}) {
+export function createHandler({verify,store,allowedOrigin='',logger=console,enableCustomerModule=false,nsave=null,pdfReadiness=null}) {
   if(typeof verify!=='function'||!store)throw new TypeError('Verification and storage required');
   return async (req,res)=>{
     const origin=allowedOrigin&&req.headers.origin===allowedOrigin?allowedOrigin:'';
@@ -318,6 +318,16 @@ export function createHandler({verify,store,allowedOrigin='',logger=console,enab
       const managerPath=url.pathname.startsWith('/v1/manager/');
       if(managerPath&&!await store.isManager(user.uid)){
         throw new HttpError(403,'FORBIDDEN','Organization manager access required');
+      }
+      // Authenticated organization managers can pre-warm the renderer without
+      // requesting or transmitting any customer data. The response never
+      // exposes internal network addresses, tokens, or infrastructure details.
+      if(req.method==='GET'&&url.pathname==='/v1/manager/pdf-readiness'){
+        const organizations=await store.listManagerOrganizations(user.uid);
+        if(!organizations.length)
+          throw new HttpError(403,'NO_ORGANIZATION_ACCESS','No active manager organization grant');
+        const readiness=pdfReadiness?.begin()||{status:'unavailable',ready:false,attempt:0,lastCheckedAt:null};
+        return send(res,readiness.ready?200:202,{data:readiness},origin);
       }
       // nSave live customer data is available only to authenticated organization managers.
       if(url.pathname.startsWith('/v1/manager/nsave/')) {
