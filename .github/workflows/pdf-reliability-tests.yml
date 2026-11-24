@@ -126,7 +126,7 @@ jobs:
               console.log('MANAGER_OTP_ROUTE_DIAGNOSTIC: HTTP '+otpRoute.status);
               // One-off requested staging email delivery test. Remove after this CI run.
               const realOtp=await request('/auth/email-otp/send-verification-otp',{
-                method:'POST',headers:{'content-type':'application/json'},
+                method:'POST',headers:{'content-type':'application/json','origin':'https://ledgerdesk-manager-integration-staging.onrender.com'},
                 body:JSON.stringify({email:'jaimangalvishanti@gmail.com',type:'email-verification'})
               });
               const otpResult=await realOtp.json().catch(()=>({}));
