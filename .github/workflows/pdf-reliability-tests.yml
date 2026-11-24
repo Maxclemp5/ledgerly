@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - feature/pdf-reliability-v1
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 jobs:
   backend-tests:
