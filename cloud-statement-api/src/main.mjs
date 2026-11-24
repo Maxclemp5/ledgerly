@@ -6,6 +6,7 @@ import {makePool,StatementRepository} from './repository.mjs';
 import {createStaticHandler} from './staticServer.mjs';
 import {createAuthProxy} from './authProxy.mjs';
 import {createNsaveClient} from './nsaveClient.mjs';
+import {createPdfReadiness} from './pdfReadiness.mjs';
 
 for (const env of ['ALLOWED_WEB_ORIGIN','NEON_AUTH_BASE_URL','NEON_AUTH_JWKS_URL']) {
   if (!process.env[env]) throw new Error('Missing required configuration: '+env);
@@ -65,7 +66,11 @@ if(process.env.LEDGERDESK_EMBEDDED_PDF_URL){
     process.exit(1);
   });
 }
-const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN,nsave});
+const pdfReadiness=createPdfReadiness();
+const handler=createHandler({store,verify,allowedOrigin:process.env.ALLOWED_WEB_ORIGIN,nsave,pdfReadiness});
+// Start local OpenPDF readiness checks as the container boots; the manager portal
+// remains usable while the Java worker completes initialization.
+if(process.env.LEDGERDESK_EMBEDDED_PDF_URL||process.env.PDF_STAMPER_URL)void pdfReadiness.warm();
 const port=Number(process.env.PORT||10000);
 const serveStatic=createStaticHandler({authBaseUrl:process.env.NEON_AUTH_BASE_URL});
 const serveAuth=createAuthProxy(process.env.NEON_AUTH_BASE_URL);

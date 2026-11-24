@@ -200,7 +200,30 @@ function ManagerWorkspace({client,session,onSignOut}){
   const [error,setError]=useState('');
   const [mobile,setMobile]=useState(false);
   const [refresh,setRefresh]=useState(0);
+  const [pdfStatus,setPdfStatus]=useState('starting');
   const api=useManagerApi(client,onSignOut);
+  // Manager-only prewarming. No customer data is passed to this endpoint.
+  // Poll only during startup; a dashboard refresh can repeat readiness.
+  useEffect(()=>{
+    if(!access?.manager||access?.pendingPasswordChange)return;
+    let active=true, timer=null, checks=0;
+    const poll=async()=>{
+      checks++;
+      let ready=false;
+      try{
+        const result=await api('/v1/manager/pdf-readiness');
+        if(!active)return;
+        setPdfStatus(result?.status||'unavailable');
+        ready=result?.ready===true;
+      }catch{
+        if(!active)return;
+        setPdfStatus('unavailable');
+      }
+      if(active&&!ready&&checks<35)timer=setTimeout(poll,3000);
+    };
+    void poll();
+    return()=>{active=false;if(timer)clearTimeout(timer);};
+  },[api,access?.manager,access?.pendingPasswordChange,refresh]);
   const loadAccess=useCallback(async()=>{
     setLoading(true);setError('');
     try{setAccess(await api('/v1/me/access'));}
@@ -226,6 +249,8 @@ function ManagerWorkspace({client,session,onSignOut}){
       <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={()=>setMobile(!mobile)}><Menu size={21}/></button>
           <div className="breadcrumb">Organization <ChevronRight size={15}/> <strong>Manager Dashboard</strong></div>
         </div><div className="topbar-right">
+          {access?.manager&&!access?.pendingPasswordChange&&<span className="environment-badge" role="status" aria-live="polite">PDF: {pdfStatus==='ready'?'Ready':pdfStatus==='unavailable'?'Needs retry':pdfStatus==='recovering'?'Recovering…':'Starting…'}</span>}
+          {access?.manager&&pdfStatus==='unavailable'&&<button className="icon-button" title="Retry PDF readiness" aria-label="Retry PDF readiness" onClick={()=>{setPdfStatus('starting');setRefresh(v=>v+1);}}><RefreshCw size={17}/></button>}
           <span className="environment-badge"><span className="live-light"/> TEST ENVIRONMENT</span>
           <div className="user-info"><span className="user-avatar">{String(user)[0]?.toUpperCase()||'M'}</span>
             <span className="user-name"><strong>{user}</strong><small>Organization manager</small></span></div>

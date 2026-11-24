@@ -1,0 +1,149 @@
+name: PDF Reliability Branch Tests
+on:
+  push:
+    branches:
+      - feature/pdf-reliability-v1
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud-statement-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Run backend unit tests
+        run: npm test
+      - name: Validate syntax
+        run: |
+          node --check src/main.mjs
+          node --check src/handler.mjs
+          node --check src/pdfReadiness.mjs
+  dashboard-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud-statement-api/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Build manager dashboard
+        run: npm run build
+
+  staging-smoke:
+    # Isolated no-credentials staging only; never call production or customer APIs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify live staging renderer and synthetic PDF
+        env:
+          STAGING_HEALTH_URL: https://ledgerdesk-pdf-wake-staging.onrender.com/health
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const deadline=Date.now()+180000;
+          let attempts=0;
+          while(Date.now()<deadline){
+            attempts++;
+            try {
+              const controller=new AbortController();
+              const timeout=setTimeout(()=>controller.abort(),95000);
+              let response;
+              try { response=await fetch(process.env.STAGING_HEALTH_URL,{cache:'no-store',signal:controller.signal}); }
+              finally { clearTimeout(timeout); }
+              const body=await response.json();
+              console.log(JSON.stringify({attempts,httpStatus:response.status,status:body.status,
+                ready:body.ready,uptimeSeconds:body.uptimeSeconds,
+                syntheticPdfTest:body.syntheticPdfTest}));
+              assert.equal(body.service,'pdf-reliability-staging');
+              if(response.ok&&body.ready===true&&body.syntheticPdfTest==='passed'){
+                console.log('STAGING_HTTP_SMOKE: PASSED');
+                process.exit(0);
+              }
+              if(body.syntheticPdfTest==='failed')throw Error('Synthetic PDF validation failed');
+            } catch(error) {
+              console.error('Staging health attempt:',error.message);
+            }
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          console.error('STAGING_HTTP_SMOKE: FAILED (renderer not ready within 180 seconds)');
+          process.exit(1);
+          NODE
+
+  manager-staging-smoke:
+    # Separate Neon staging project; no production identities or customer data.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Manager staging frontend, auth configuration and anonymous denial
+        env:
+          MANAGER_STAGING_URL: https://ledgerdesk-manager-integration-staging.onrender.com
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base=process.env.MANAGER_STAGING_URL;
+          async function request(path,init={}){
+            const c=new AbortController();
+            const timer=setTimeout(()=>c.abort(),100000);
+            try{return await fetch(base+path,{...init,signal:c.signal});}
+            finally{clearTimeout(timer);}
+          }
+          const deadline=Date.now()+200000;
+          let passed=false;
+          while(Date.now()<deadline){
+            try{
+              const cfg=await request('/public-config');
+              assert.equal(cfg.status,200);
+              const json=await cfg.json();
+              assert.equal(json.authProxyUrl,'/auth');
+              assert.ok(json.authUrl.includes('.neonauth.'));
+              const denied=await request('/v1/manager/pdf-readiness');
+              assert.equal(denied.status,401);
+              // Safe route diagnostic: intentionally omit email, so no OTP is sent.
+              // A 400/422 indicates the route exists; a 404 indicates a broken path.
+              const otpRoute=await request('/auth/email-otp/send-verification-otp',{
+                method:'POST',headers:{'content-type':'application/json'},
+                body:JSON.stringify({type:'email-verification'})
+              });
+              console.log('MANAGER_OTP_ROUTE_DIAGNOSTIC: HTTP '+otpRoute.status);
+              assert.ok([400,401,403,422,429].includes(otpRoute.status),
+                'OTP API route unexpected status='+otpRoute.status);
+              // Real Neon sign-in endpoint must reject an incorrect password.
+              // No credentials or OTPs are logged or stored in this repository.
+              const badLogin=await request('/auth/sign-in/email',{
+                method:'POST',headers:{'content-type':'application/json'},
+                body:JSON.stringify({email:'test@nsave.work',password:'intentionally-invalid-test-only'})
+              });
+              assert.ok([400,401,403,422].includes(badLogin.status),
+                'Invalid credentials must not authenticate, status='+badLogin.status);
+              const page=await request('/');
+              assert.equal(page.status,200);
+              const html=await page.text();
+              assert.ok(html.includes('<html')||html.includes('<!doctype html'));
+              console.log('MANAGER_STAGING_HTTP_SMOKE: PASSED; independent login frontend, auth settings and anonymous denial');
+              passed=true;break;
+            }catch(error){
+              console.error('Manager staging initializing:',error.message);
+              await new Promise(resolve=>setTimeout(resolve,5000));
+            }
+          }
+          if(!passed)process.exit(1);
+          NODE
