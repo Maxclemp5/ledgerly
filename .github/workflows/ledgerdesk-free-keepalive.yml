@@ -1,0 +1,29 @@
+name: LedgerDesk Free 10-minute Health Check
+# Lightweight external GET only. No customer data, passwords, or PDF requests.
+# GitHub scheduled jobs can be delayed or skipped; this is best-effort monitoring.
+on:
+  schedule:
+    - cron: '7-57/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ledgerdesk-free-keepalive
+  cancel-in-progress: true
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check LedgerDesk Free health
+        shell: bash
+        run: |
+          set -eu
+          code=$(curl --location --silent --show-error \
+            --connect-timeout 12 --max-time 95 \
+            --output /tmp/health.json --write-out '%{http_code}' \
+            'https://ledgerly-free-test-api.onrender.com/health')
+          echo "LedgerDesk Free /health returned HTTP ${code}"
+          test "${code}" = 200
+          grep -q '"ok":true' /tmp/health.json
+          echo "LedgerDesk Free health check passed"
