@@ -117,6 +117,14 @@ jobs:
               assert.ok(json.authUrl.includes('.neonauth.'));
               const denied=await request('/v1/manager/pdf-readiness');
               assert.equal(denied.status,401);
+              // Real Neon sign-in endpoint must reject an incorrect password.
+              // No credentials or OTPs are logged or stored in this repository.
+              const badLogin=await request('/auth/sign-in/email',{
+                method:'POST',headers:{'content-type':'application/json'},
+                body:JSON.stringify({email:'test@nsave.work',password:'intentionally-invalid-test-only'})
+              });
+              assert.ok([400,401,403,422].includes(badLogin.status),
+                'Invalid credentials must not authenticate, status='+badLogin.status);
               const page=await request('/');
               assert.equal(page.status,200);
               const html=await page.text();
