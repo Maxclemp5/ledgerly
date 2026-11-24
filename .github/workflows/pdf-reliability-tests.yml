@@ -124,15 +124,6 @@ jobs:
                 body:JSON.stringify({type:'email-verification'})
               });
               console.log('MANAGER_OTP_ROUTE_DIAGNOSTIC: HTTP '+otpRoute.status);
-              // One-off requested staging email delivery test. Remove after this CI run.
-              const realOtp=await request('/auth/email-otp/send-verification-otp',{
-                method:'POST',headers:{'content-type':'application/json','origin':'https://ledgerdesk-manager-integration-staging.onrender.com'},
-                body:JSON.stringify({email:'jaimangalvishanti@gmail.com',type:'email-verification'})
-              });
-              const otpResult=await realOtp.json().catch(()=>({}));
-              console.log('MANAGER_OTP_SEND_ONCE: HTTP '+realOtp.status+
-                ' errorCode='+String(otpResult?.code||otpResult?.error?.code||'none').slice(0,70));
-
               assert.ok([400,401,403,422,429].includes(otpRoute.status),
                 'OTP API route unexpected status='+otpRoute.status);
               // Real Neon sign-in endpoint must reject an incorrect password.
