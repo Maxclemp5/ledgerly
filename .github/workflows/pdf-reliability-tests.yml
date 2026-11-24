@@ -41,3 +41,46 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Build manager dashboard
         run: npm run build
+
+  staging-smoke:
+    # Isolated no-credentials staging only; never call production or customer APIs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify live staging renderer and synthetic PDF
+        env:
+          STAGING_HEALTH_URL: https://ledgerdesk-pdf-wake-staging.onrender.com/health
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const deadline=Date.now()+180000;
+          let attempts=0;
+          while(Date.now()<deadline){
+            attempts++;
+            try {
+              const controller=new AbortController();
+              const timeout=setTimeout(()=>controller.abort(),95000);
+              let response;
+              try { response=await fetch(process.env.STAGING_HEALTH_URL,{cache:'no-store',signal:controller.signal}); }
+              finally { clearTimeout(timeout); }
+              const body=await response.json();
+              console.log(JSON.stringify({attempts,httpStatus:response.status,status:body.status,
+                ready:body.ready,uptimeSeconds:body.uptimeSeconds,
+                syntheticPdfTest:body.syntheticPdfTest}));
+              assert.equal(body.service,'pdf-reliability-staging');
+              if(response.ok&&body.ready===true&&body.syntheticPdfTest==='passed'){
+                console.log('STAGING_HTTP_SMOKE: PASSED');
+                process.exit(0);
+              }
+              if(body.syntheticPdfTest==='failed')throw Error('Synthetic PDF validation failed');
+            } catch(error) {
+              console.error('Staging health attempt:',error.message);
+            }
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          console.error('STAGING_HTTP_SMOKE: FAILED (renderer not ready within 180 seconds)');
+          process.exit(1);
+          NODE
