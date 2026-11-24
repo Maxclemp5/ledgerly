@@ -48,7 +48,9 @@ export function createPdfReadiness({
     if(!force&&state==='ready'&&now()-lastReadyAt<readyTtlMs)return Promise.resolve(true);
     const base=getBase();
     if(!base){state='unavailable';return Promise.resolve(false);}
-    state='starting';
+    // Keep an already-verified worker available while a nonblocking refresh
+    // runs. Only enter starting for first initialization or actual recovery.
+    if(state!=='ready')state='starting';
     attempt=0;
     const task=(async()=>{
       const deadline=now()+maxWaitMs;
